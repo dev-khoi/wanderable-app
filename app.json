@@ -33,7 +33,8 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "@rnmapbox/maps"
     ],
     "experiments": {
       "typedRoutes": true

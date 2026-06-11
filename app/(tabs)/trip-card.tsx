@@ -6,6 +6,7 @@ import { wanderableTheme } from '@/constants/wanderableTheme';
 import { AvatarPlaceholder, NotificationBell, PrimaryButton, TripSummaryCard } from '@/components/wanderable';
 
 const AUTOSCAN_ROUTE = '/autoscan' as Href;
+const TRIP_VIEW_ROUTE = '/trip-view' as Href;
 const { colors } = wanderableTheme;
 
 export default function TripCardScreen() {
@@ -30,7 +31,13 @@ export default function TripCardScreen() {
 
       <TripSummaryCard scale={scale} style={{ position: 'absolute', top: s(130), left: canvasLeft + s(23) }} />
 
-      <PrimaryButton title="Add Trip" scale={scale} style={{ position: 'absolute', top: s(548), left: canvasLeft + s(25), width: s(327), height: s(48) }} onPress={() => router.replace(AUTOSCAN_ROUTE)} />
+      <PrimaryButton title="View Rebuilt Trip" scale={scale} style={{ position: 'absolute', top: s(548), left: canvasLeft + s(25), width: s(327), height: s(48) }} onPress={() => router.push(TRIP_VIEW_ROUTE)} />
+      <Text
+        className="absolute text-center font-semibold"
+        style={{ top: s(612), left: canvasLeft + s(40), width: s(295), fontSize: s(12), color: colors.text.muted }}
+        onPress={() => router.replace(AUTOSCAN_ROUTE)}>
+        Scan again
+      </Text>
     </View>
   );
 }

@@ -13,13 +13,15 @@
 
 - Single Expo Router app. Entry is `expo-router/entry` from `package.json`; this is not a monorepo.
 - Root wiring is `app/_layout.tsx`: gesture handler, reanimated, `app/global.css`, font loading, splash handling, and `AppProviders` all start there.
-- `app/(tabs)/_layout.tsx` is now a headerless `Stack`, not a real bottom tab navigator. Current routes in `app/(tabs)` are the onboarding/import prototype: `index.tsx`, `autoscan.tsx`, `trip-card.tsx`.
-- `README.md` still describes the target product IA with Trips / Map / Profile, but the executable app currently implements only the onboarding/import flow. Trust the code for current wiring and `README.md` / `wanderable.md` for future direction.
+- `app/(tabs)/_layout.tsx` is a headerless `Stack`, not a real bottom tab navigator. Verified routes today: `index`, `auth`, `autoscan`, `trip-card`, `trip-view`, `trip-edit`.
+- `README.md` still describes the target IA with Trips / Map / Profile. The executable app is still a prototype flow, so trust the route files and `app/(tabs)/_layout.tsx` for what actually exists.
 - Expo Router API routes use `+api` filenames; current example is `app/api/health+api.ts`.
 
 ## Installed Stack That Changes Decisions
 
-- Native modules are already installed: `react-native-mmkv`, `react-native-reanimated`, `react-native-gesture-handler`, `expo-sqlite`, `expo-symbols`. Do not assume Expo Go is enough for iOS device testing; a dev build may be required.
+- Native modules already in use: `react-native-mmkv`, `react-native-reanimated`, `react-native-gesture-handler`, `expo-sqlite`, `expo-symbols`, `@rnmapbox/maps`.
+- `@rnmapbox/maps` is configured via the Expo config plugin in `app.json`. The native map only works in a dev build; Expo Go falls back because the native module is unavailable there.
+- Mapbox runtime token is `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` in `.env` / `.env.example`.
 - React Query is initialized once in `lib/providers.tsx` with a shared `QueryClient`.
 - Supabase client setup is in `lib/supabase.ts` and expects `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 - Supabase auth persistence uses MMKV in `lib/storage.ts`, not AsyncStorage.
@@ -32,7 +34,8 @@
 - Uniwind is wired through `metro.config.js` and `app/global.css`; the CSS sources are `app`, `components`, and `lib` only.
 - `className` support for React Native components is declared in `types/uniwind.d.ts`, while Metro is configured to emit `uniwind-types.d.ts`. If `className` types break, check both files plus `tsconfig.json` includes before changing component code.
 - Wanderable UI colors now live in `constants/wanderableTheme.ts`; the companion reference doc is `docs/wanderable-color-theme.md`. For Wanderable screens/components, prefer those tokens over raw hex or inline `rgba(...)` strings.
-- Reusable Wanderable UI primitives live in `components/wanderable/index.tsx`. Extend those before duplicating onboarding/trip-card UI pieces in routes.
+- Reusable Wanderable UI primitives live in `components/wanderable/index.tsx`; the Mapbox trip-map wrapper lives in `components/wanderable/TripMap.native.tsx` with a web/native-unavailable fallback in `components/wanderable/TripMap.tsx`.
+- The current trip prototype uses `lib/mockData.ts` as shared in-memory state between `trip-view` and `trip-edit`; do not add persistence assumptions when editing those screens.
 - After changing Metro or Uniwind config, restart Metro.
 - `app.json` has `experiments.typedRoutes = true` and `tsconfig.json` includes `.expo/types/**/*.ts`. If route string types look wrong, start Expo once to regenerate route types before adding broad casts.
 
@@ -42,6 +45,7 @@
 - Install: `npm install`
 - Start dev server: `npm run start`
 - Start targets: `npm run android`, `npm run ios`, `npm run web`
+- For native Mapbox work, use a dev build (`npx expo run:ios` / `npx expo run:android`) instead of Expo Go.
 - Typecheck: `npx tsc --noEmit`
 - Sync Prisma client after schema edits: `npm run prisma:generate`
 - `npm run prisma:migrate` exists, but it needs `DATABASE_URL` in local env.
@@ -57,5 +61,5 @@
 
 - The product's first-run flow is permission-driven photo import. If you add photo-library access for a release build, add the iOS permission usage strings in app config before submission; `app.json` does not currently define photo permission copy.
 - Keep account creation optional in the reviewable path unless the product truly requires it. The repo's product docs explicitly say onboarding should be short and permission-driven, not an account wall.
-- Avoid shipping dead-end placeholder CTAs in the App Store build. Reviewers should be able to move from onboarding to scanning and see a coherent result without hidden internal setup.
+- Avoid shipping dead-end placeholder CTAs in a reviewable build. Reviewers should be able to move from onboarding to scanning to a coherent trip result without hidden setup.
 - If you add Supabase auth or cloud-source connectors to the review path, include review credentials/instructions in App Store review notes; otherwise keep those integrations optional so the core photo-reconstruction value is still testable.
