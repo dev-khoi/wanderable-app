@@ -1,0 +1,12 @@
+[
+  
+
+  {
+    "key": "alt+up",
+    "command": "workbench.action.terminal.focusPrevious"
+  },
+  {
+    "key": "alt+down",
+    "command": "workbench.action.terminal.focusNext"
+  }
+]
