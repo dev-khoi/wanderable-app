@@ -11,8 +11,14 @@ import { PrimaryButton, WanderableWordmark } from "@/components/wanderable";
 import { wanderableTheme } from "@/constants/wanderableTheme";
 
 const MAP_IMAGE = require("@/assets/images/onboarding-map.png");
-const AUTH_SIGN_IN_ROUTE = "/auth?mode=signin" as Href;
-const AUTH_SIGN_UP_ROUTE = "/auth?mode=signup" as Href;
+const AUTH_SIGN_IN_ROUTE = {
+  pathname: "/auth",
+  params: { mode: "signin" },
+} as Href;
+const AUTH_SIGN_UP_ROUTE = {
+  pathname: "/auth",
+  params: { mode: "signup" },
+} as Href;
 const { colors } = wanderableTheme;
 
 export default function OnboardingScreen() {

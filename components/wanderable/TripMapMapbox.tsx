@@ -41,6 +41,7 @@ function getMapboxModule(): RNMapboxModule | null {
 export type TripMapProps = {
   activeNodeId: string;
   allNodes: TripNode[];
+  initialCenterCoordinate?: [number, number] | null;
   nodes: TripNode[];
   routeSegments: RouteSegment[];
   scale: number;
@@ -51,6 +52,7 @@ export type TripMapProps = {
 export function TripMapMapbox({
   activeNodeId,
   allNodes,
+  initialCenterCoordinate,
   nodes,
   routeSegments,
   scale,
@@ -61,6 +63,7 @@ export function TripMapMapbox({
     return <Text>Error</Text>;
   }
   const Mapbox = getMapboxModule();
+  const hasAppliedInitialCenterRef = useRef(false);
   const cameraRef = useRef<any>(null);
   const wasGlobeOverviewRef = useRef(false);
   const [currentZoom, setCurrentZoom] = useState(CITY_ZOOM_LEVEL);
@@ -148,6 +151,19 @@ export function TripMapMapbox({
       return;
     }
 
+    if (initialCenterCoordinate && !hasAppliedInitialCenterRef.current) {
+      hasAppliedInitialCenterRef.current = true;
+      cameraRef.current?.setCamera({
+        centerCoordinate: initialCenterCoordinate,
+        zoomLevel: CITY_ZOOM_LEVEL,
+        pitch: 0,
+        heading: 0,
+        animationMode: "flyTo",
+        animationDuration: 900,
+      });
+      return;
+    }
+
     cameraRef.current?.setCamera({
       centerCoordinate: activeNode.coordinate,
       zoomLevel: CITY_ZOOM_LEVEL,
@@ -156,7 +172,14 @@ export function TripMapMapbox({
       animationMode: "flyTo",
       animationDuration: 950,
     });
-  }, [Mapbox, activeNodeId, allNodes, selectedZoomLabel, tripCenterCoordinate]);
+  }, [
+    Mapbox,
+    activeNodeId,
+    allNodes,
+    initialCenterCoordinate,
+    selectedZoomLabel,
+    tripCenterCoordinate,
+  ]);
 
   useEffect(() => {
     if (!Mapbox) {
@@ -237,7 +260,7 @@ export function TripMapMapbox({
           ref={cameraRef}
           minZoomLevel={0}
           zoomLevel={CITY_ZOOM_LEVEL}
-          centerCoordinate={allNodes[0]?.coordinate}
+          centerCoordinate={initialCenterCoordinate ?? allNodes[0]?.coordinate}
           pitch={48}
           heading={12}
         />

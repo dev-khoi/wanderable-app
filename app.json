@@ -11,7 +11,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.khoilikereact.wanderable",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Allow Wanderable to use your location so the trip map can open from where you are right now."
       }
     },
     "android": {
@@ -38,6 +39,7 @@
           "backgroundColor": "#ffffff"
         }
       ],
+      "expo-location",
       "expo-sqlite",
       "@rnmapbox/maps"
     ],

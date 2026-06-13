@@ -5,11 +5,11 @@ import {
   useEffect,
   useMemo,
   useState,
-} from 'react';
+} from "react";
 
-import { type Session, type User } from '@supabase/supabase-js';
+import { type Session, type User } from "@supabase/supabase-js";
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from "@/lib/supabase";
 
 type AuthContextValue = {
   isLoading: boolean;
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
 
       if (error) {
-        console.warn('Failed to restore Supabase session.', error.message);
+        console.warn("Failed to restore Supabase session.", error.message);
       }
 
       setSession(data.session ?? null);
@@ -76,8 +76,8 @@ export function useAuth() {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider.');
+    throw new Error("useAuth must be used within AuthProvider.");
   }
-
+  // console.log(context);
   return context;
 }
