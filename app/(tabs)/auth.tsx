@@ -1,5 +1,5 @@
+import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from "expo-router";
-import { SymbolView } from "expo-symbols";
 import { useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -17,19 +17,29 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton, WanderableWordmark } from "@/components/wanderable";
 import { wanderableTheme } from "@/constants/wanderableTheme";
+import { useAuth } from '@/lib/auth';
+import {
+  createSessionFromUrl,
+  signInWithEmailPassword,
+  signInWithGoogle,
+  signUpWithEmailPassword,
+} from '@/lib/supabase-auth';
 
 type AuthMode = "signin" | "signup";
-type SignUpStep = "name" | "credentials" | "code";
+type SignUpStep = "name" | "credentials" | "confirmation";
 
 const AUTOSCAN_ROUTE = "/autoscan";
 const GOOGLE_LOGO_URI =
   "https://developers.google.com/identity/images/g-logo.png";
 const { colors } = wanderableTheme;
+const MIN_PASSWORD_LENGTH = 8;
 
 export default function AuthScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const incomingUrl = Linking.useURL();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const { isLoading: isAuthLoading, session } = useAuth();
   const scale = Math.min(width / 375, height / 812);
   const s = (value: number) => value * scale;
   const canvasLeft = (width - s(375)) / 2;
@@ -40,22 +50,150 @@ export default function AuthScreen() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const handledUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     setAuthMode(initialMode);
     setSignUpStep("name");
   }, [initialMode]);
 
+  useEffect(() => {
+    if (session) {
+      router.replace(AUTOSCAN_ROUTE);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (!incomingUrl || handledUrlRef.current === incomingUrl) {
+      return;
+    }
+
+    handledUrlRef.current = incomingUrl;
+    setErrorMessage(null);
+    setInfoMessage('Finishing sign-in...');
+    setIsSubmitting(true);
+
+    void createSessionFromUrl(incomingUrl)
+      .then((nextSession) => {
+        if (nextSession) {
+          router.replace(AUTOSCAN_ROUTE);
+          return;
+        }
+
+        setInfoMessage(null);
+      })
+      .catch((error: unknown) => {
+        setErrorMessage(
+          error instanceof Error ? error.message : 'Unable to finish sign-in.',
+        );
+        setInfoMessage(null);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
+  }, [incomingUrl]);
+
   const setMode = (nextMode: AuthMode) => {
     setAuthMode(nextMode);
     setSignUpStep("name");
+    setErrorMessage(null);
+    setInfoMessage(null);
     router.setParams({ mode: nextMode });
+  };
+
+  const handleGoogleAuth = async () => {
+    try {
+      setErrorMessage(null);
+      setInfoMessage(null);
+      setIsSubmitting(true);
+
+      const nextSession = await signInWithGoogle();
+
+      if (nextSession) {
+        router.replace(AUTOSCAN_ROUTE);
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Unable to sign in with Google.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEmailSignIn = async () => {
+    if (!email.trim() || !password) {
+      setErrorMessage('Enter both your email and password.');
+      return;
+    }
+
+    try {
+      setErrorMessage(null);
+      setInfoMessage(null);
+      setIsSubmitting(true);
+      await signInWithEmailPassword(email.trim(), password);
+      router.replace(AUTOSCAN_ROUTE);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Unable to sign in.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEmailSignUp = async () => {
+    if (!firstName.trim() || !lastName.trim()) {
+      setErrorMessage('Add your first and last name to continue.');
+      return;
+    }
+
+    if (!email.trim() || !password) {
+      setErrorMessage('Enter an email and password to create your account.');
+      return;
+    }
+
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setErrorMessage(`Use at least ${MIN_PASSWORD_LENGTH} characters for your password.`);
+      return;
+    }
+
+    try {
+      setErrorMessage(null);
+      setInfoMessage(null);
+      setIsSubmitting(true);
+
+      const data = await signUpWithEmailPassword({
+        email: email.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        password,
+      });
+
+      if (data.session) {
+        router.replace(AUTOSCAN_ROUTE);
+        return;
+      }
+
+      setSignUpStep('confirmation');
+      setInfoMessage('Check your email for the confirmation link, then come back and sign in.');
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Unable to create your account.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isSignIn = authMode === "signin";
   const signUpTitle =
-    signUpStep === "code" ? "Enter confirmation code" : "Create your account";
+    signUpStep === 'confirmation'
+      ? 'Confirm your email'
+      : 'Create your account';
 
   return (
     <View
@@ -161,14 +299,10 @@ export default function AuthScreen() {
                 {isSignIn ? (
                   <>
                     <SocialAuthButton
-                      label="Continue with Apple"
-                      provider="apple"
-                      scale={scale}
-                    />
-                    <SocialAuthButton
                       label="Continue with Google"
                       provider="google"
                       scale={scale}
+                      onPress={handleGoogleAuth}
                     />
                     <AuthDivider label="or use email" scale={scale} />
 
@@ -205,16 +339,7 @@ export default function AuthScreen() {
                           Sign up with email
                         </Text>
                       </Pressable>
-                      <Pressable accessibilityRole="button">
-                        <Text
-                          className="font-bold"
-                          style={{
-                            fontSize: s(13),
-                            color: colors.brand.secondary,
-                          }}>
-                          Forgot?
-                        </Text>
-                      </Pressable>
+                      <View />
                     </View>
                   </>
                 ) : (
@@ -273,24 +398,20 @@ export default function AuthScreen() {
                       </>
                     ) : null}
 
-                    {signUpStep === "code" ? (
-                      <CodeField
-                        scale={scale}
-                        value={code}
-                        onChangeText={setCode}
-                      />
+                    {signUpStep === 'confirmation' ? (
+                      <ConfirmationMessage scale={scale} email={email.trim()} />
                     ) : null}
 
                     <View
                       className="mt-1 flex-row items-center justify-between"
                       style={{ marginBottom: s(28) }}>
                       <View />
-                      {signUpStep !== "name" ? (
+                      {signUpStep !== 'name' && signUpStep !== 'confirmation' ? (
                         <Pressable
                           accessibilityRole="button"
                           onPress={() =>
                             setSignUpStep(
-                              signUpStep === "credentials" ? "name" : "credentials"
+                              signUpStep === 'credentials' ? 'name' : 'credentials'
                             )
                           }>
                           <Text
@@ -310,31 +431,51 @@ export default function AuthScreen() {
                 )}
               </Animated.View>
 
+              {errorMessage ? (
+                <AuthFeedbackMessage kind="error" message={errorMessage} scale={scale} />
+              ) : null}
+
+              {infoMessage ? (
+                <AuthFeedbackMessage kind="info" message={infoMessage} scale={scale} />
+              ) : null}
+
               <PrimaryButton
                 title={
-                  isSignIn
-                    ? "Sign In"
-                    : "Continue"
+                  isSubmitting || isAuthLoading
+                    ? 'Working...'
+                    : isSignIn
+                      ? 'Sign In'
+                      : signUpStep === 'name'
+                        ? 'Continue'
+                        : signUpStep === 'credentials'
+                          ? 'Create account'
+                          : 'Go to Sign In'
                 }
                 scale={scale}
                 style={{ width: "100%", height: s(52) }}
                 onPress={() => {
+                  if (isSubmitting || isAuthLoading) {
+                    return;
+                  }
+
                   if (isSignIn) {
-                    router.replace(AUTOSCAN_ROUTE);
+                    void handleEmailSignIn();
                     return;
                   }
 
                   if (signUpStep === "name") {
+                    setErrorMessage(null);
+                    setInfoMessage(null);
                     setSignUpStep("credentials");
                     return;
                   }
 
                   if (signUpStep === "credentials") {
-                    setSignUpStep("code");
+                    void handleEmailSignUp();
                     return;
                   }
 
-                  router.replace(AUTOSCAN_ROUTE);
+                  setMode('signin');
                 }}
               />
             </View>
@@ -377,11 +518,12 @@ function ModeButton({ label, active, scale, onPress }: ModeButtonProps) {
 
 type SocialAuthButtonProps = {
   label: string;
-  provider: "apple" | "google";
+  provider: 'google';
   scale: number;
+  onPress: () => void;
 };
 
-function SocialAuthButton({ label, provider, scale }: SocialAuthButtonProps) {
+function SocialAuthButton({ label, provider, scale, onPress }: SocialAuthButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -390,10 +532,11 @@ function SocialAuthButton({ label, provider, scale }: SocialAuthButtonProps) {
         height: 52 * scale,
         borderRadius: 16 * scale,
         borderWidth: 1,
-        borderColor: "#ECE7F1",
-        backgroundColor: colors.background.surface,
-        marginBottom: 12 * scale,
-      }}>
+         borderColor: "#ECE7F1",
+         backgroundColor: colors.background.surface,
+         marginBottom: 12 * scale,
+       }}
+      onPress={onPress}>
       <View
         className="items-center justify-center"
         style={{
@@ -413,42 +556,17 @@ function SocialAuthButton({ label, provider, scale }: SocialAuthButtonProps) {
 }
 
 type SocialAuthIconProps = {
-  provider: "apple" | "google";
+  provider: 'google';
   scale: number;
 };
 
 function SocialAuthIcon({ provider, scale }: SocialAuthIconProps) {
-  if (provider === "google") {
-    return (
-      <Image
-        source={{ uri: GOOGLE_LOGO_URI }}
-        resizeMode="contain"
-        style={{ width: 20 * scale, height: 20 * scale }}
-      />
-    );
-  }
-
-  if (Platform.OS === "ios") {
-    return (
-      <SymbolView
-        name="applelogo"
-        type="monochrome"
-        tintColor={colors.text.primary}
-        style={{ width: 20 * scale, height: 20 * scale }}
-      />
-    );
-  }
-
   return (
-    <Text
-      className="font-extrabold"
-      style={{
-        fontSize: 18 * scale,
-        lineHeight: 20 * scale,
-        color: colors.text.primary,
-      }}>
-      
-    </Text>
+    <Image
+      source={{ uri: GOOGLE_LOGO_URI }}
+      resizeMode="contain"
+      style={{ width: 20 * scale, height: 20 * scale }}
+    />
   );
 }
 
@@ -530,66 +648,70 @@ function AuthField({
   );
 }
 
-type CodeFieldProps = {
+type ConfirmationMessageProps = {
   scale: number;
-  value: string;
-  onChangeText: (value: string) => void;
+  email: string;
 };
 
-function CodeField({ scale, value, onChangeText }: CodeFieldProps) {
-  const inputRef = useRef<TextInput>(null);
-  const nextValue = value.slice(0, 6);
-
+function ConfirmationMessage({ scale, email }: ConfirmationMessageProps) {
   return (
     <View style={{ marginBottom: 18 * scale }}>
       <Text
         className="mb-2 font-bold"
         style={{ fontSize: 13 * scale, color: colors.text.primary }}>
-        Confirmation Code
+        One more step
       </Text>
-      <TextInput
-        ref={inputRef}
-        placeholder="123456"
-        placeholderTextColor={colors.text.subtle}
-        value={nextValue}
-        onChangeText={(text) =>
-          onChangeText(text.replace(/\D/g, "").slice(0, 6))
-        }
-        keyboardType="number-pad"
-        autoCapitalize="none"
-        autoCorrect={false}
-        className="font-medium"
+      <View
         style={{
-          position: "absolute",
-          opacity: 0,
-          width: 1,
-          height: 1,
-        }}
-      />
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => inputRef.current?.focus()}
-        style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        {Array.from({ length: 6 }).map((_, index) => (
-          <View
-            key={index}
-            className="items-center justify-center"
-            style={{
-              width: 44 * scale,
-              height: 52 * scale,
-              borderRadius: 16 * scale,
-              borderWidth: 1,
-              borderColor: "#ECE7F1",
-              backgroundColor: "#FBFAFD",
-            }}>
-            <Text
-              className="font-extrabold"
-              style={{ fontSize: 18 * scale, color: colors.text.primary }}>
-              {nextValue[index] ?? ""}
-            </Text>
-          </View>
-        ))}
-      </Pressable>
+          borderRadius: 16 * scale,
+          borderWidth: 1,
+          borderColor: '#ECE7F1',
+          backgroundColor: '#FBFAFD',
+          paddingHorizontal: 16 * scale,
+          paddingVertical: 14 * scale,
+        }}>
+        <Text
+          className="font-medium"
+          style={{
+            fontSize: 14 * scale,
+            lineHeight: 20 * scale,
+            color: colors.text.primary,
+          }}>
+          We sent a confirmation link to {email || 'your email address'}. Confirm it,
+          then come back here and sign in.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+type AuthFeedbackMessageProps = {
+  kind: 'error' | 'info';
+  message: string;
+  scale: number;
+};
+
+function AuthFeedbackMessage({ kind, message, scale }: AuthFeedbackMessageProps) {
+  return (
+    <View
+      style={{
+        marginBottom: 16 * scale,
+        borderRadius: 16 * scale,
+        paddingHorizontal: 14 * scale,
+        paddingVertical: 12 * scale,
+        backgroundColor:
+          kind === 'error' ? 'rgba(223, 59, 111, 0.1)' : 'rgba(36, 165, 158, 0.1)',
+      }}>
+      <Text
+        className="font-semibold"
+        style={{
+          fontSize: 13 * scale,
+          lineHeight: 18 * scale,
+          color:
+            kind === 'error' ? colors.brand.secondary : colors.brand.primary,
+        }}>
+        {message}
+      </Text>
     </View>
   );
 }
