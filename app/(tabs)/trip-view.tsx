@@ -24,15 +24,29 @@ export default function TripViewScreen() {
   const [zoomIndex, setZoomIndex] = useState(2);
   const [isStoryOpen, setIsStoryOpen] = useState(false);
 
-  const visibleNodes = selectedDayId === 'all' ? trip.nodes : trip.nodes.filter((node) => node.dayId === selectedDayId);
-  const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
-  const visibleRouteSegments = trip.routeSegments.filter((segment) => visibleNodeIds.has(segment.fromNodeId) && visibleNodeIds.has(segment.toNodeId));
   const activeNode = trip.nodes.find((node) => node.id === activeNodeId) ?? trip.nodes[0];
   const activeIndex = Math.max(0, trip.nodes.findIndex((node) => node.id === activeNode.id));
   const activeMedia = activeNode.media[0];
 
   const goToNode = (nodeId: string) => {
+    const nextNode = trip.nodes.find((node) => node.id === nodeId);
+
     setActiveNodeId(nodeId);
+    if (nextNode) {
+      setSelectedDayId(nextNode.dayId);
+    }
+    setIsStoryOpen(false);
+  };
+
+  const goToDay = (dayId: string) => {
+    const firstNodeForDay = trip.nodes.find((node) => node.dayId === dayId);
+
+    if (!firstNodeForDay) {
+      return;
+    }
+
+    setSelectedDayId(dayId);
+    setActiveNodeId(firstNodeForDay.id);
     setIsStoryOpen(false);
   };
 
@@ -68,8 +82,8 @@ export default function TripViewScreen() {
         <TripMap
           activeNodeId={activeNode.id}
           allNodes={trip.nodes}
-          nodes={visibleNodes}
-          routeSegments={visibleRouteSegments}
+          nodes={trip.nodes}
+          routeSegments={trip.routeSegments}
           scale={scale}
           selectedZoomLabel={trip.zoomStops[zoomIndex] ?? 'City'}
           onSelectNode={goToNode}
@@ -108,7 +122,7 @@ export default function TripViewScreen() {
         <View className="flex-row" style={{ marginBottom: s(10), gap: s(8) }}>
           <DayChip active={selectedDayId === 'all'} label="All" scale={scale} onPress={() => setSelectedDayId('all')} />
           {trip.days.map((day) => (
-            <DayChip key={day.id} active={selectedDayId === day.id} label={day.label.replace('Day ', 'D')} scale={scale} onPress={() => setSelectedDayId(day.id)} />
+            <DayChip key={day.id} active={selectedDayId === day.id} label={day.label.replace('Day ', 'D')} scale={scale} onPress={() => goToDay(day.id)} />
           ))}
         </View>
 
