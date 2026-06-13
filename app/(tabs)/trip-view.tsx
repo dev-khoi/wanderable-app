@@ -47,7 +47,7 @@ export default function TripViewScreen() {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.background.surface }}>
+    <View className="flex-1 " style={{ backgroundColor: colors.background.surface }}>
       <View
         className="absolute flex-row items-center justify-between"
         style={{ top: insets.top, left: canvasLeft, width: s(375), height: s(44), paddingHorizontal: s(12), zIndex: 10 }}>
@@ -63,6 +63,7 @@ export default function TripViewScreen() {
         </Pressable>
       </View>
 
+      {/* trip map */}
       <View style={{ position: 'absolute', top: insets.top + s(44), left: canvasLeft + s(2), width: s(371), height: height - insets.top - s(44), overflow: 'hidden', backgroundColor: colors.map.ocean }}>
         <TripMap
           activeNodeId={activeNode.id}
