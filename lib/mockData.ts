@@ -2,6 +2,8 @@ import { useSyncExternalStore } from 'react';
 
 export type TransportMode = 'car' | 'bike' | 'walk' | 'fly' | 'none';
 
+export type MediaPlacementStatus = 'placed' | 'missing_location' | 'skipped';
+
 export type MediaItem = {
   id: string;
   type: 'photo' | 'video';
@@ -9,6 +11,7 @@ export type MediaItem = {
   takenAt: string;
   description: string;
   hasGps: boolean;
+  placementStatus: MediaPlacementStatus;
 };
 
 export type TripNode = {
@@ -123,6 +126,7 @@ export const mockTrip: Trip = {
           takenAt: '2026-03-18T19:12:00.000Z',
           description: 'The crossing right after dinner, when the city felt unreal.',
           hasGps: true,
+          placementStatus: 'placed',
         },
         {
           id: 'media-shibuya-2',
@@ -131,6 +135,7 @@ export const mockTrip: Trip = {
           takenAt: '2026-03-18T20:08:00.000Z',
           description: 'Neon alleys and vending machines everywhere.',
           hasGps: true,
+          placementStatus: 'placed',
         },
       ],
     },
@@ -153,6 +158,7 @@ export const mockTrip: Trip = {
           takenAt: '2026-03-19T08:22:00.000Z',
           description: 'View from the train before Kyoto.',
           hasGps: true,
+          placementStatus: 'placed',
         },
       ],
     },
@@ -176,6 +182,7 @@ export const mockTrip: Trip = {
           takenAt: '2026-03-19T16:11:00.000Z',
           description: 'First view of the torii gates.',
           hasGps: true,
+          placementStatus: 'placed',
         },
         {
           id: 'media-fushimi-2',
@@ -184,6 +191,7 @@ export const mockTrip: Trip = {
           takenAt: '2026-03-19T16:47:00.000Z',
           description: 'A quieter path after the crowds thinned out.',
           hasGps: true,
+          placementStatus: 'placed',
         },
       ],
     },
@@ -206,6 +214,7 @@ export const mockTrip: Trip = {
           takenAt: '2026-03-20T10:04:00.000Z',
           description: 'Morning light through the bamboo.',
           hasGps: true,
+          placementStatus: 'placed',
         },
       ],
     },
@@ -229,6 +238,7 @@ export const mockTrip: Trip = {
           takenAt: '2026-03-20T13:21:00.000Z',
           description: 'The one deer that bowed before stealing the whole stack.',
           hasGps: true,
+          placementStatus: 'placed',
         },
       ],
     },
@@ -251,6 +261,7 @@ export const mockTrip: Trip = {
           takenAt: '2026-03-20T20:42:00.000Z',
           description: 'Takoyaki stand before the river walk.',
           hasGps: true,
+          placementStatus: 'placed',
         },
       ],
     },
@@ -270,6 +281,7 @@ export const mockTrip: Trip = {
       takenAt: '2026-03-19T18:05:00.000Z',
       description: 'Dinner photo with no location attached.',
       hasGps: false,
+      placementStatus: 'missing_location',
     },
     {
       id: 'media-missing-2',
@@ -278,6 +290,7 @@ export const mockTrip: Trip = {
       takenAt: '2026-03-20T18:35:00.000Z',
       description: 'Short clip from a side street, location unknown.',
       hasGps: false,
+      placementStatus: 'missing_location',
     },
   ],
 };

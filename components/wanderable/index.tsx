@@ -305,10 +305,25 @@ export function AvatarPlaceholder({ scale, style }: AvatarPlaceholderProps) {
 }
 
 type TripSummaryCardProps = ScaledProps & {
+  coverUri?: string | null;
+  dateLabel?: string;
+  distanceLabel?: string;
+  durationLabel?: string;
+  locationLabel?: string;
+  title?: string;
   style?: StyleProp<ViewStyle>;
 };
 
-export function TripSummaryCard({ scale, style }: TripSummaryCardProps) {
+export function TripSummaryCard({
+  coverUri,
+  dateLabel = "Date TBD",
+  distanceLabel = "0 km",
+  durationLabel = "0 days",
+  locationLabel = "Unknown location",
+  title = "Untitled trip",
+  scale,
+  style,
+}: TripSummaryCardProps) {
   const s = (value: number) => value * scale;
 
   return (
@@ -328,6 +343,32 @@ export function TripSummaryCard({ scale, style }: TripSummaryCardProps) {
         },
         style,
       ]}>
+      {coverUri ? (
+        <Image
+          source={{ uri: coverUri }}
+          resizeMode="cover"
+          style={{
+            position: "absolute",
+            top: s(12),
+            left: s(12),
+            width: s(292),
+            height: s(334),
+            borderRadius: s(12),
+          }}
+        />
+      ) : (
+        <View
+          className="absolute"
+          style={{
+            top: s(12),
+            left: s(12),
+            width: s(292),
+            height: s(334),
+            borderRadius: s(12),
+            backgroundColor: colors.surface.muted,
+          }}
+        />
+      )}
       <View
         className="absolute"
         style={{
@@ -336,7 +377,7 @@ export function TripSummaryCard({ scale, style }: TripSummaryCardProps) {
           width: s(292),
           height: s(334),
           borderRadius: s(12),
-          backgroundColor: colors.surface.muted,
+          backgroundColor: "rgba(16, 19, 32, 0.18)",
         }}
       />
       <Text
@@ -346,9 +387,9 @@ export function TripSummaryCard({ scale, style }: TripSummaryCardProps) {
           left: s(23),
           fontSize: s(24),
           lineHeight: s(29),
-          color: colors.text.strong,
+          color: colors.text.inverse,
         }}>
-        name of trip
+        {title}
       </Text>
       <View
         className="absolute flex-row items-center"
@@ -356,8 +397,8 @@ export function TripSummaryCard({ scale, style }: TripSummaryCardProps) {
         <WanderableMark size={s(12)} style={{ marginRight: s(4) }} />
         <Text
           className="font-semibold"
-          style={{ fontSize: s(12), color: colors.text.muted }}>
-          location
+          style={{ fontSize: s(12), color: colors.text.inverse }}>
+          {locationLabel}
         </Text>
       </View>
       <View
@@ -368,11 +409,11 @@ export function TripSummaryCard({ scale, style }: TripSummaryCardProps) {
           width: s(272),
           height: s(44),
           borderRadius: s(12),
-          backgroundColor: colors.surface.soft,
+          backgroundColor: "rgba(255,255,255,0.85)",
         }}>
-        <StatText scale={scale}>{"2026\nmarch"}</StatText>
-        <StatText scale={scale}>{"3\ndays"}</StatText>
-        <StatText scale={scale}>{"20\nkm"}</StatText>
+        <StatText scale={scale}>{dateLabel.replace(" ", "\n")}</StatText>
+        <StatText scale={scale}>{durationLabel.replace(" ", "\n")}</StatText>
+        <StatText scale={scale}>{distanceLabel.replace(" ", "\n")}</StatText>
       </View>
     </View>
   );

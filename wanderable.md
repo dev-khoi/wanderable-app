@@ -4,7 +4,7 @@
 
 ## The one-line pitch
 
-You already took the photos. We'll rebuild the trip.
+You already took the photos. We'll rebuild the trip into highlights worth reliving.
 
 ---
 
@@ -19,6 +19,31 @@ Every other travel app asks you to do something before or during your trip — o
 Import → Reconstruct → Edit → View on map → Share.
 
 The map view is the destination. Everything else in the product exists to feed it. A user who has done zero editing should still be able to land on the map view and feel something. A user who has spent an hour editing should feel the difference.
+
+---
+
+# Core content model
+
+Wanderable should feel Instagram-like in interaction speed, but follow Polarsteps in business shape: the user ends up with a trip artifact they are proud to relive and share.
+
+The primary objects are:
+
+- Trip: the full travel artifact owned by one user
+- Highlight: the main swipeable chapter on the map; this is the map-following unit
+- Story: the nested memory unit inside a highlight
+- Media: photo or video attached to a story, with time and location metadata
+
+Rules for the model:
+
+- One trip has many highlights
+- One highlight has many stories
+- One story can render one or more media assets, but the story remains the narrative unit
+- Highlights sit next to each other and can be swiped horizontally
+- The active highlight controls what the map is focused on
+- Opening a highlight should feel like a story viewer, not a full-screen modal wall
+- Trips belong to one user in v1, but can be shared read-only by link
+
+This replaces the older day-first mental model. Days can still be derived from timestamps later, but they are not the primary UI or database object.
 
 ---
 
@@ -85,47 +110,40 @@ Never a blocking gate.
 
 # Step 3 — Editing suite
 
-The node card is the primary editing unit.
+The highlight is the primary editing unit.
 
-Each card shows:
-- the photos in that cluster (swipeable)
-- the auto-named location (editable inline)
-- a time range
-- a map thumbnail of the area
-- a blog entry prompt
+Each highlight should show:
+- a cover media asset
+- a location anchor on the map
+- a sequence of stories inside it
+- a start/end time window derived from its stories
+- lightweight summary text if the user wants it
+
+Each story should show:
+- photo or video media
+- a title
+- a short description or journal text
+- location metadata
+- captured date and time
 
 ## Core editing actions
 
-- Merge two adjacent nodes into one event, the user must be able to drag to merge
+- Rename a highlight
+- Reorder highlights inside a trip
+- Reorder stories inside a highlight
+- Add or remove media from a story
+- Edit story title, description, location label, and date context
+- Choose the cover media for a highlight and for the trip
+- Decide whether a story inherits the highlight location or overrides it
 
-## NODE requirements
+Core rules:
 
-- a node can have multiple pictures
-- pictures must be arranged ascending timely order
-- user can write blog like how polarstep is
-- a node must only have a location
+- Highlights are the map-following object
+- Stories are the narrative object
+- Media must stay sorted chronologically inside a story unless the user explicitly reorders it
+- Missing GPS media should never block the flow; it can stay off-map until the user assigns it or the system infers it later
 
-- Split a node that grouped too broadly, the user can take a picture that they don't want to belong to the node, to put it to other
-
-- the line connecting to node, can have the icon on it
-  - for now just have:
-    - car
-    - bike
-    - walk
-    - fly
-    - none for default
-
-- Rename any node (pre-filled from reverse geocoding)
-- Add a text blog entry per node or per day
-- Record a voice note tied to a specific node — preserved as audio, optionally transcribed into the blog field
-- Drag photos between nodes
-- Reorder days
-- Set a cover photo for the trip and for each day
-- Pin a manual location for GPS-missing photos
-
-missing gps photos should all go to photos box that the user can add, if they dont add, it will just not be shown
-
-Voice notes are a priority feature, not a nice-to-have. People narrate travel memories naturally and rarely type them. A 30-second voice note captured two days after a trip carries more emotional truth than a caption written six months later. The waveform display in the final view adds texture to the story.
+This editing suite should feel like curating a trip recap, not fixing a database. The user is shaping a story output they can relive and share.
 
 ---
 
@@ -137,24 +155,25 @@ After reconstruction and editing, the user lands on an interactive map that show
 
 ## What the map shows
 
-similar to a polar tree
+similar to a Polarsteps route, but consumed through highlight swiping
 
-- A route line connecting all memory nodes in sequence, derived from node centroids — not continuous GPS tracking, so there is no transit clutter, only meaningful stops
+- A route line connecting all highlights in sequence, derived from their map anchors rather than continuous GPS tracking
 
-- Pins at each node, sized or colored by the number of photos
+- Pins or markers at each highlight
 
-- Tapping a pin opens that node's card:
-  - photos
-  - location name
-  - time
-  - blog entry
-  - voice note player
+- The active highlight card at the bottom, showing the current chapter the user is browsing
 
-- A timeline scrubber at the bottom that lets the user move through the trip chronologically, with the map panning to follow
+- Horizontal swiping between highlights, with the map panning to follow the active highlight automatically
 
-- Day selector to jump between days
+- Tapping a highlight opens a story viewer that covers around 80% of the screen instead of taking over the entire app
 
-- The full route across all days is visible at once in a trip overview zoom
+- Inside the open story viewer:
+  - tap left half to go back
+  - tap right half to go forward
+  - hold to pause
+  - swipe horizontally to move between highlights
+
+- The full route across all highlights remains visible in the trip overview state
 
 The map view should feel like reliving the trip, not filing it.
 
@@ -163,7 +182,7 @@ The emotional register of the product lives here.
 Design decisions:
 - pin style
 - route line weight
-- animation when scrubbing
+- animation when swiping between highlights and opening the story viewer
 
 matter more here than anywhere else in the app.
 
@@ -179,40 +198,33 @@ must be mobile-friendly, it can be shared through instagram
 
 From the map view, the user taps share.
 
-Three outputs:
+The core sharing outputs are:
 
 ## Public trip page
 
-A shareable URL that renders the map view and timeline for anyone with the link — no app required, no account required.
+A shareable URL that renders the trip map, highlight sequence, and story viewer for anyone with the link — no app required, no account required.
 
 Includes:
 - the route map
-- day-by-day breakdown
-- photos
-- blog entries
-- voice note players
+- the ordered highlights
+- story media
+- story titles and descriptions
+- date and location context
 
 Designed to be worth sharing as a link on its own, not just a redirect to download the app.
 
 ---
 
-## Instagram export
+## Highlight-first sharing
 
-Wanderable turns your camera roll into a beautiful, shareable travel story automatically.
+Wanderable turns a trip into a set of polished highlights that feel natural to share on Instagram, WhatsApp, and group chats.
 
-Instead of tracking GPS like Strava or asking users to journal during trips, Wanderable reconstructs journeys from existing photos — generating a cinematic route map, travel stats, memory timelines, and interactive trip pages from moments people already captured.
+The core sharing experience is:
+- a public trip page with the route and full highlight/story structure
+- a compact share card that previews the trip visually
+- a highlight/story interaction model that feels familiar to story viewers without becoming a social feed
 
-The core sharing experience is a clean Instagram-story-style travel card showing:
-- the route
-- distance traveled
-- trip duration
-- key memories
-
-with viewers able to tap into a full interactive map experience.
-
-Wanderable is not a social network or trip planner; it is a post-travel memory system designed to make lived experiences feel meaningful, aesthetic, and worth sharing.
-
-Like how Strava is trending for Instagram share stories
+The product should feel Instagram-like in interaction design, but not in business model. The value comes from rebuilding and curating a trip artifact, not from building a feed.
 
 The sharing experience is not a feed or a social network.
 
@@ -232,80 +244,17 @@ Wanderable produces the content; distribution is the user's.
 
 # Monetization
 
-* ignore the nfc and printed travel book for now 
+The business should still learn from Polarsteps: the core value is a trip output that users want to revisit and share. Wanderable should not chase social engagement loops or planning tools.
 
-Three models, each reinforcing the core loop rather than interrupting it.
+Near-term business leverage comes from:
+- a trip artifact people are proud to publish by link
+- a shareable highlight/story experience that fits how people already distribute memories
+- future premium outputs built on top of a structured trip model
 
-## Printed travel book
-
-After a user views their finished trip on the map, the natural question is:
-
-> how do I keep this?
-
-The book answers that.
-
-It generates automatically from the trip structure:
-- photos
-- day labels
-- blog entries
-- transcribed voice notes
-- the route map as an insert
-
-No additional layout work from the user.
-
-Price point:
-- $35–65 depending on length
-
-fulfilled via print-on-demand partner.
-
-This is the primary revenue model and the one with the most validated demand — Polarsteps built $10M in annual revenue almost entirely on this single product, with users who had already done the curation work inside the app.
-
----
-
-## NFC souvenir tag
-
-A small NFC sticker that the user adheres to any physical object they brought home from the trip:
-- a keychain
-- a magnet
-- a postcard frame
-- a piece of pottery
-
-When tapped by any NFC-enabled phone, it opens that trip's published page directly.
-
-Wanderable hosts the link permanently.
-
-The use case is visceral and immediate:
-
-> tap the keychain from Kyoto and the whole trip opens.
-
-There is independent market validation for this — a Berlin startup called Memoried raised $129,000 from 699 backers on exactly this concept, with organic campaign reach of 3 million people on Instagram.
-
-Wanderable's version is stronger because the trip story already exists inside the app — users are not uploading photos to a tag, they are linking a tag to something they already built.
-
-Price point:
-- $8–15 per tag
-- with multi-packs at a discount
-
-Natural gift product between travel partners.
-
----
-
-## Wanderable Pro subscription
-
-Unlocks:
-- unlimited trips
-- custom map styles
-- watermark removal
-- priority book fulfillment
-
-Free tier:
-- last 6 trips
-
-Suggested pricing:
-- $5/month
-- $39/year
-
-Build this last — the physical products validate willingness to pay more concretely than a subscription experiment can.
+The product should first prove that:
+- users understand the trip → highlight → story model
+- the map and highlight viewer feel emotionally strong
+- sharing a trip artifact is meaningfully better than dumping photos into a feed
 
 ---
 
@@ -332,66 +281,65 @@ No:
 
 A publishing tool, not a platform.
 
+Instagram-like gestures are allowed. Instagram-like incentives are not.
+
 ---
 
 # Build sequence
 
-## Phase 1 — Reconstruction and map view
+## Phase 1 — Trip, highlight, and story model
 
-Photo import, EXIF parsing, clustering, day grouping, reverse geocoding, map display with pins and route line.
+Get the core domain right first:
+- trip ownership
+- media upload and metadata storage
+- highlight ordering
+- story rendering
+- map-following highlight behavior
+- read-only sharing by link
 
-The only goal is:
-- the activation moment
-- the first version of the map view
-
-No editing, no export.
-
-If this phase doesn't make users say "wow" before they've touched anything, the product premise needs to be reconsidered before building further.
-
----
-
-## Phase 2 — Core editing
-
-very easy Merge, rename, reorder, add blog text, voice notes.
-
-The minimum suite that makes the reconstruction worth curating.
+The goal is to prove the object model and interaction model before the full reconstruction engine is layered on top.
 
 ---
 
-## Phase 3 — Sharing and book export
+## Phase 2 — Reconstruction and curation
+
+Add reconstruction logic that can understand uploaded media metadata and generate draft highlights and stories.
+
+Then add lightweight curation:
+- rename highlights
+- reorder highlights
+- edit story text
+- fix locations
+- choose cover media
+
+---
+
+## Phase 3 — Sharing and premium outputs
 
 - Public trip page
-- Instagram export
-- book ordering
+- Highlight/story share cards
+- richer exported outputs built from the structured trip model
 
-First monetization.
-
-Public launch happens here.
+Public launch happens once the map and highlight viewer feel good enough to share.
 
 ---
 
-## Phase 4 — NFC tags and Pro tier
+## Phase 4 — Expanded premium business model
 
-The differentiated premium product and the subscription unlock.
-
-Only after the core loop has demonstrated retention.
+Once the core trip artifact has clear demand, expand into premium outputs and higher-value share or export layers.
 
 ---
 
 # The competitive position in plain language
 
-Polarsteps is a GPS tracker that also stores memories.
+Polarsteps is a trip artifact built from captured travel progress.
 
-Wanderable is a memory system that also shows where you were.
+Wanderable is a trip artifact rebuilt from captured media.
 
 Esplorio had the same instinct and died because it had no revenue model and no compelling output — its map view was functional, not emotional.
 
 Wanderable's map view is the product, not a feature.
 
-The physical export layer gives it two revenue models validated before a line of code is written:
-- one proven by Polarsteps itself
-- one proven by independent crowdfunding demand
-
-The opening is real.
+The opening is not in becoming another travel social app. It is in making trips feel structured, aesthetic, and easy to share from the media people already have.
 
 Execution sequencing and the quality of the map view experience are the only things that will determine whether it gets captured.

@@ -1,14 +1,35 @@
-import { type Href, router } from 'expo-router';
-import { useState } from 'react';
-import { Image, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { type Href, router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Image,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { wanderableTheme } from '@/constants/wanderableTheme';
-import { type MediaItem, type TransportMode, type TripNode, updateMockTrip, useMockTrip } from '@/lib/mockData';
+import {
+  ActionButton,
+  EditableTitleCard,
+  EditHeader,
+  EditSheet,
+  HighlightCard,
+  MetaPill,
+  RouteConnector,
+  SectionHeading,
+} from "@/components/trip-edit";
+import { wanderableTheme } from "@/constants/wanderableTheme";
+import {
+  type MediaItem,
+  type RouteSegment,
+  type TripNode,
+  updateMockTrip,
+  useMockTrip,
+} from "@/lib/mockData";
 
-const TRIP_VIEW_ROUTE = '/trip-view' as Href;
+const TRIP_VIEW_ROUTE = "/trip-view" as Href;
 const { colors } = wanderableTheme;
-const transportOrder: TransportMode[] = ['none', 'walk', 'bike', 'car', 'fly'];
 
 export default function TripEditScreen() {
   const insets = useSafeAreaInsets();
@@ -16,132 +37,53 @@ export default function TripEditScreen() {
   const trip = useMockTrip();
   const scale = Math.min(width / 375, height / 812);
   const s = (value: number) => value * scale;
-  const [activeNodeId, setActiveNodeId] = useState(trip.nodes[2]?.id ?? trip.nodes[0].id);
-  const activeNode = trip.nodes.find((node) => node.id === activeNodeId) ?? trip.nodes[0];
-  const activeDay = trip.days.find((day) => day.id === activeNode.dayId) ?? trip.days[0];
-  const activeSegment = trip.routeSegments.find((segment) => segment.fromNodeId === activeNode.id || segment.toNodeId === activeNode.id);
+  const [selectedNodeId, setSelectedNodeId] = useState(trip.nodes[0]?.id ?? "");
+  const selectedNode =
+    trip.nodes.find((node) => node.id === selectedNodeId) ?? trip.nodes[0];
+  const unresolvedMissingMedia = useMemo(
+    () =>
+      trip.missingGpsMedia.filter(
+        (media) => media.placementStatus === "missing_location",
+      ),
+    [trip.missingGpsMedia],
+  );
+  const skippedMissingCount = useMemo(
+    () =>
+      trip.missingGpsMedia.filter(
+        (media) => media.placementStatus === "skipped",
+      ).length,
+    [trip.missingGpsMedia],
+  );
 
-  const updateActiveNode = (changes: Partial<TripNode>) => {
-    updateMockTrip((currentTrip) => ({
-      ...currentTrip,
-      nodes: currentTrip.nodes.map((node) => (node.id === activeNode.id ? { ...node, ...changes } : node)),
-    }));
-  };
-
-  const updateMediaDescription = (mediaId: string, description: string) => {
-    updateMockTrip((currentTrip) => ({
-      ...currentTrip,
-      nodes: currentTrip.nodes.map((node) => {
-        if (node.id !== activeNode.id) {
-          return node;
-        }
-
-        return {
-          ...node,
-          media: node.media.map((media) => (media.id === mediaId ? { ...media, description } : media)),
-        };
-      }),
-    }));
-  };
-
-  const mergeWithPrevious = () => {
-    const activeIndex = trip.nodes.findIndex((node) => node.id === activeNode.id);
-
-    if (activeIndex <= 0) {
-      return;
+  useEffect(() => {
+    if (!trip.nodes.some((node) => node.id === selectedNodeId)) {
+      setSelectedNodeId(trip.nodes[0]?.id ?? "");
     }
-
-    const previousNode = trip.nodes[activeIndex - 1];
-    const mergedNode: TripNode = {
-      ...activeNode,
-      id: `${previousNode.id}-${activeNode.id}-merged`,
-      title: `${previousNode.title} + ${activeNode.title}`,
-      timeRange: `${previousNode.timeRange.split(' - ')[0]} - ${activeNode.timeRange.split(' - ')[1] ?? activeNode.timeRange}`,
-      photoCount: previousNode.photoCount + activeNode.photoCount,
-      blog: `${previousNode.blog}\n\n${activeNode.blog}`,
-      voiceNoteSeconds: activeNode.voiceNoteSeconds ?? previousNode.voiceNoteSeconds,
-      media: [...previousNode.media, ...activeNode.media].sort((a, b) => a.takenAt.localeCompare(b.takenAt)),
-    };
-
-    updateMockTrip((currentTrip) => ({
-      ...currentTrip,
-      nodes: currentTrip.nodes.flatMap((node) => {
-        if (node.id === previousNode.id) {
-          return [mergedNode];
-        }
-
-        if (node.id === activeNode.id) {
-          return [];
-        }
-
-        return [node];
-      }),
-      routeSegments: currentTrip.routeSegments
-        .filter((segment) => !(segment.fromNodeId === previousNode.id && segment.toNodeId === activeNode.id))
-        .map((segment) => ({
-          ...segment,
-          fromNodeId: segment.fromNodeId === activeNode.id || segment.fromNodeId === previousNode.id ? mergedNode.id : segment.fromNodeId,
-          toNodeId: segment.toNodeId === activeNode.id || segment.toNodeId === previousNode.id ? mergedNode.id : segment.toNodeId,
-        }))
-        .filter((segment) => segment.fromNodeId !== segment.toNodeId),
-    }));
-    setActiveNodeId(mergedNode.id);
-  };
-
-  const splitLastMedia = () => {
-    if (activeNode.media.length < 2) {
-      return;
-    }
-
-    const mediaToSplit = activeNode.media[activeNode.media.length - 1];
-    const remainingMedia = activeNode.media.slice(0, -1);
-    const newNode: TripNode = {
-      ...activeNode,
-      id: `${activeNode.id}-split-${mediaToSplit.id}`,
-      title: `${activeNode.title} detail`,
-      photoCount: 1,
-      blog: 'Split from the original node. Confirm the exact location before publishing.',
-      media: [mediaToSplit],
-      coordinate: [activeNode.coordinate[0] + 0.016, activeNode.coordinate[1] + 0.01],
-      mapPoint: {
-        x: Math.min(92, activeNode.mapPoint.x + 8),
-        y: Math.min(88, activeNode.mapPoint.y + 5),
-      },
-    };
-
-    updateMockTrip((currentTrip) => ({
-      ...currentTrip,
-      nodes: currentTrip.nodes.flatMap((node) => {
-        if (node.id !== activeNode.id) {
-          return [node];
-        }
-
-        return [{ ...node, media: remainingMedia, photoCount: remainingMedia.length }, newNode];
-      }),
-      routeSegments: [
-        ...currentTrip.routeSegments,
-        {
-          id: `segment-${activeNode.id}-${newNode.id}`,
-          fromNodeId: activeNode.id,
-          toNodeId: newNode.id,
-          transport: 'walk',
-        },
-      ],
-    }));
-    setActiveNodeId(newNode.id);
-  };
+  }, [selectedNodeId, trip.nodes]);
 
   const moveMissingMediaToNode = (media: MediaItem) => {
+    if (!selectedNode) {
+      return;
+    }
+
     updateMockTrip((currentTrip) => ({
       ...currentTrip,
-      missingGpsMedia: currentTrip.missingGpsMedia.filter((item) => item.id !== media.id),
+      missingGpsMedia: currentTrip.missingGpsMedia.filter(
+        (item) => item.id !== media.id,
+      ),
       nodes: currentTrip.nodes.map((node) => {
-        if (node.id !== activeNode.id) {
+        if (node.id !== selectedNode.id) {
           return node;
         }
 
-        const mediaWithGps = { ...media, hasGps: true };
-        const nextMedia = [...node.media, mediaWithGps].sort((a, b) => a.takenAt.localeCompare(b.takenAt));
+        const mediaWithGps = {
+          ...media,
+          hasGps: true,
+          placementStatus: "placed" as const,
+        };
+        const nextMedia = [...node.media, mediaWithGps].sort((a, b) =>
+          a.takenAt.localeCompare(b.takenAt),
+        );
 
         return {
           ...node,
@@ -155,189 +97,345 @@ export default function TripEditScreen() {
   const skipMissingMedia = (mediaId: string) => {
     updateMockTrip((currentTrip) => ({
       ...currentTrip,
-      missingGpsMedia: currentTrip.missingGpsMedia.filter((media) => media.id !== mediaId),
+      missingGpsMedia: currentTrip.missingGpsMedia.map((media) =>
+        media.id === mediaId ? { ...media, placementStatus: "skipped" } : media,
+      ),
     }));
   };
 
-  const cycleTransport = () => {
-    if (!activeSegment) {
+  const moveHighlight = (nodeId: string, direction: -1 | 1) => {
+    const currentIndex = trip.nodes.findIndex((node) => node.id === nodeId);
+    const nextIndex = currentIndex + direction;
+
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= trip.nodes.length) {
       return;
     }
 
-    const currentIndex = transportOrder.indexOf(activeSegment.transport);
-    const nextTransport = transportOrder[(currentIndex + 1) % transportOrder.length];
-
     updateMockTrip((currentTrip) => ({
       ...currentTrip,
-      routeSegments: currentTrip.routeSegments.map((segment) => (segment.id === activeSegment.id ? { ...segment, transport: nextTransport } : segment)),
+      nodes: moveListItem(currentTrip.nodes, currentIndex, nextIndex),
+      routeSegments: rebuildRouteSegments(
+        moveListItem(currentTrip.nodes, currentIndex, nextIndex),
+        currentTrip.routeSegments,
+      ),
     }));
+    setSelectedNodeId(nodeId);
   };
 
-  const reorderDays = () => {
-    updateMockTrip((currentTrip) => {
-      const [firstDay, ...restDays] = currentTrip.days;
-
-      return {
-        ...currentTrip,
-        days: [...restDays, firstDay],
-      };
-    });
-  };
-
-  const setTripCover = () => {
-    const coverUri = activeNode.media[0]?.uri ?? trip.coverUri;
+  const setTripCover = (nodeId: string) => {
+    const node = trip.nodes.find((item) => item.id === nodeId);
+    const coverUri = node?.media[0]?.uri ?? trip.coverUri;
     updateMockTrip((currentTrip) => ({ ...currentTrip, coverUri }));
   };
 
+  const addHighlight = () => {
+    const anchorNode = trip.nodes[trip.nodes.length - 1] ?? selectedNode;
+    const nextIndex = trip.nodes.length + 1;
+
+    if (!anchorNode) {
+      return;
+    }
+
+    const newNode: TripNode = {
+      ...anchorNode,
+      id: `node-added-${nextIndex}`,
+      title: `New highlight ${nextIndex}`,
+      locationName: anchorNode.locationName,
+      timeRange: "Time TBD",
+      mapPoint: {
+        x: Math.min(94, anchorNode.mapPoint.x + 6),
+        y: Math.min(90, anchorNode.mapPoint.y + 4),
+      },
+      coordinate: [
+        anchorNode.coordinate[0] + 0.02,
+        anchorNode.coordinate[1] + 0.015,
+      ],
+      photoCount: 0,
+      blog: "Add the summary that should carry this highlight on the map.",
+      media: [],
+      voiceNoteSeconds: undefined,
+    };
+
+    updateMockTrip((currentTrip) => {
+      const nextNodes = [...currentTrip.nodes, newNode];
+
+      return {
+        ...currentTrip,
+        nodes: nextNodes,
+        routeSegments: rebuildRouteSegments(
+          nextNodes,
+          currentTrip.routeSegments,
+        ),
+      };
+    });
+
+    setSelectedNodeId(newNode.id);
+  };
+
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.background.surface }}>
+    <View className="flex-1" style={{ backgroundColor: "#D6D3DB" }}>
       <View
-        className="absolute left-0 right-0 z-10 flex-row items-center justify-between bg-white px-5"
-        style={{ top: 0, paddingTop: insets.top, height: insets.top + s(62), borderBottomWidth: 1, borderBottomColor: colors.surface.cardBorder }}>
-        <Pressable accessibilityRole="button" onPress={() => router.replace(TRIP_VIEW_ROUTE)}>
-          <Text className="font-extrabold" style={{ fontSize: s(14), color: colors.text.primary }}>Cancel</Text>
-        </Pressable>
-        <Text className="font-extrabold" style={{ fontSize: s(16), color: colors.text.strong }}>Edit Trip</Text>
-        <Pressable accessibilityRole="button" onPress={() => router.replace(TRIP_VIEW_ROUTE)}>
-          <Text className="font-extrabold" style={{ fontSize: s(14), color: colors.brand.secondary }}>Done</Text>
-        </Pressable>
+        className="absolute left-0 right-0 top-0"
+        style={{ height: insets.top + s(228), backgroundColor: "#D1CED6" }}>
+        <Image
+          source={{ uri: trip.coverUri }}
+          resizeMode="cover"
+          style={{ width: "100%", height: "100%" }}
+        />
+        <View
+          className="absolute inset-0"
+          style={{ backgroundColor: "rgba(28, 18, 67, 0.14)" }}
+        />
       </View>
+      <EditHeader
+        title="edit"
+        top={insets.top}
+        onBack={() => router.replace(TRIP_VIEW_ROUTE)}
+        scale={scale}
+      />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: insets.top + s(82), paddingBottom: s(32), paddingHorizontal: s(18), minHeight: height }}>
-        <View className="rounded-3xl p-4" style={{ backgroundColor: colors.surface.soft }}>
-          <Image source={{ uri: trip.coverUri }} resizeMode="cover" className="w-full rounded-2xl" style={{ height: s(152), backgroundColor: colors.surface.muted }} />
-          <Text className="mt-4 font-extrabold" style={{ fontSize: s(24), color: colors.text.strong }}>{trip.title}</Text>
-          <Text className="mt-1 font-semibold" style={{ fontSize: s(13), color: colors.text.muted }}>{trip.dateRange} - {trip.durationLabel} - {trip.distanceLabel}</Text>
-          <View className="mt-4 flex-row" style={{ gap: s(8) }}>
-            <EditPill label="Set cover" scale={scale} onPress={setTripCover} />
-            <EditPill label="Reorder days" scale={scale} onPress={reorderDays} />
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingTop: insets.top + s(86),
+          paddingBottom: s(32),
+          minHeight: height,
+        }}>
+        <View style={{ height: s(86) }} />
+        <EditSheet
+          style={{
+            minHeight: height - insets.top - s(88),
+            paddingHorizontal: s(20),
+            paddingTop: s(26),
+            paddingBottom: s(32),
+          }}>
+          <EditableTitleCard
+            helper="Trip name"
+            meta="Tap to rename it. The map and share views should inherit this title directly."
+            value={trip.title}
+            scale={scale}
+            onChangeText={(title) =>
+              updateMockTrip((currentTrip) => ({ ...currentTrip, title }))
+            }
+          />
+
+          <View className="mt-4 flex-row flex-wrap" style={{ gap: s(10) }}>
+            <MetaPill label="Dates" value={trip.dateRange} scale={scale} />
+            <MetaPill label="Length" value={trip.durationLabel} scale={scale} />
+            <MetaPill
+              label="Distance"
+              value={trip.distanceLabel}
+              scale={scale}
+            />
           </View>
-        </View>
 
-        <Text className="mt-6 font-extrabold" style={{ fontSize: s(18), color: colors.text.strong }}>Timeline nodes</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3">
-          <View className="flex-row" style={{ gap: s(10) }}>
-            {trip.nodes.map((node) => {
-              const isActive = node.id === activeNode.id;
+          {/* no need for this */}
+          {/* <View style={{ marginTop: s(28) }}>
+            <SectionHeading
+              body="Trip edit stays lightweight here: set the title, pick the trip cover, adjust highlight order, then jump into each highlight to curate the story photos."
+              title="Highlights"
+              scale={scale}
+            />
+          </View> */}
+
+          <View style={{ marginTop: s(18), gap: s(4) }}>
+            {trip.nodes.map((node, index) => {
+              const day = trip.days.find((item) => item.id === node.dayId);
+              const nextSegment = trip.routeSegments.find(
+                (segment) => segment.fromNodeId === node.id,
+              );
+              const isSelected = node.id === selectedNode?.id;
 
               return (
-                <Pressable
-                  key={node.id}
-                  accessibilityRole="button"
-                  className="rounded-2xl p-3"
-                  style={{ width: s(150), backgroundColor: isActive ? colors.text.primary : colors.surface.soft }}
-                  onPress={() => setActiveNodeId(node.id)}>
-                  <Image source={{ uri: node.media[0]?.uri }} resizeMode="cover" className="rounded-xl" style={{ width: '100%', height: s(86), backgroundColor: colors.surface.muted }} />
-                  <Text numberOfLines={2} className="mt-3 font-extrabold" style={{ fontSize: s(12), color: isActive ? colors.text.inverse : colors.text.strong }}>{node.title}</Text>
-                  <Text className="mt-1 font-semibold" style={{ fontSize: s(10), color: isActive ? colors.text.inverse : colors.text.muted }}>{node.photoCount} media</Text>
-                </Pressable>
+                <View key={node.id}>
+                  <HighlightCard
+                    active={isSelected}
+                    coverUri={node.media[0]?.uri ?? null}
+                    dateLabel={day ? `${day.label} • ${day.date}` : undefined}
+                    locationName={node.locationName}
+                    timeRange={node.timeRange}
+                    title={node.title}
+                    scale={scale}
+                    onPress={() => setSelectedNodeId(node.id)}
+                    onEditStories={() =>
+                      router.push({
+                        pathname: "/highlight-edit",
+                        params: { nodeId: node.id },
+                      })
+                    }
+                    onMoveEarlier={
+                      index > 0 ? () => moveHighlight(node.id, -1) : undefined
+                    }
+                    onMoveLater={
+                      index < trip.nodes.length - 1
+                        ? () => moveHighlight(node.id, 1)
+                        : undefined
+                    }
+                    onSetCover={() => setTripCover(node.id)}
+                  />
+                  {nextSegment ? (
+                    <RouteConnector
+                      transport={nextSegment.transport}
+                      scale={scale}
+                    />
+                  ) : null}
+                </View>
               );
             })}
           </View>
-        </ScrollView>
 
-        <View className="mt-5 rounded-3xl bg-white p-4" style={{ borderWidth: 1, borderColor: colors.surface.cardBorder }}>
-          <Text className="font-extrabold" style={{ fontSize: s(12), color: colors.brand.secondary }}>{activeDay.label} - {activeDay.dominantLocation}</Text>
-          <Text className="mt-3 font-extrabold" style={{ fontSize: s(14), color: colors.text.strong }}>Node name</Text>
-          <TextInput
-            className="mt-2 rounded-2xl px-4 py-3 font-bold"
-            style={{ minHeight: s(48), backgroundColor: colors.surface.soft, color: colors.text.primary, fontSize: s(14) }}
-            value={activeNode.title}
-            onChangeText={(title) => updateActiveNode({ title })}
-          />
-
-          <Text className="mt-4 font-extrabold" style={{ fontSize: s(14), color: colors.text.strong }}>Location</Text>
-          <TextInput
-            className="mt-2 rounded-2xl px-4 py-3 font-bold"
-            style={{ minHeight: s(48), backgroundColor: colors.surface.soft, color: colors.text.primary, fontSize: s(14) }}
-            value={activeNode.locationName}
-            onChangeText={(locationName) => updateActiveNode({ locationName })}
-          />
-
-          <Text className="mt-4 font-extrabold" style={{ fontSize: s(14), color: colors.text.strong }}>Blog memory</Text>
-          <TextInput
-            multiline
-            className="mt-2 rounded-2xl px-4 py-3 font-semibold"
-            style={{ minHeight: s(132), backgroundColor: colors.surface.soft, color: colors.text.primary, fontSize: s(13), textAlignVertical: 'top' }}
-            value={activeNode.blog}
-            onChangeText={(blog) => updateActiveNode({ blog })}
-          />
-
-          <View className="mt-4 flex-row flex-wrap" style={{ gap: s(8) }}>
-            <EditPill label="Merge previous" scale={scale} onPress={mergeWithPrevious} />
-            <EditPill label="Split last media" scale={scale} onPress={splitLastMedia} />
-            <EditPill label={`Transport: ${activeSegment?.transport ?? 'none'}`} scale={scale} onPress={cycleTransport} />
-            <EditPill label="Voice note 30s" scale={scale} onPress={() => updateActiveNode({ voiceNoteSeconds: 30 })} />
+          <View style={{ marginTop: s(18) }}>
+            <ActionButton
+              title="+ Add highlight"
+              onPress={addHighlight}
+              scale={scale}
+            />
           </View>
-        </View>
 
-        <Text className="mt-6 font-extrabold" style={{ fontSize: s(18), color: colors.text.strong }}>Media in this node</Text>
-        <View className="mt-3" style={{ gap: s(12) }}>
-          {activeNode.media.map((media) => (
-            <View key={media.id} className="rounded-3xl bg-white p-3" style={{ borderWidth: 1, borderColor: colors.surface.cardBorder }}>
-              <Image source={{ uri: media.uri }} resizeMode="cover" className="w-full rounded-2xl" style={{ height: s(148), backgroundColor: colors.surface.muted }} />
-              <Text className="mt-3 font-extrabold" style={{ fontSize: s(12), color: colors.text.strong }}>{media.type.toUpperCase()} - {new Date(media.takenAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
-              <TextInput
-                className="mt-2 rounded-2xl px-4 py-3 font-semibold"
-                style={{ minHeight: s(56), backgroundColor: colors.surface.soft, color: colors.text.primary, fontSize: s(12), textAlignVertical: 'top' }}
-                value={media.description}
-                onChangeText={(description) => updateMediaDescription(media.id, description)}
-              />
-            </View>
-          ))}
-        </View>
+          <View style={{ marginTop: s(30) }}>
+            <SectionHeading
+              body="Photos without a location never block the trip. Add them to the selected highlight when you know where they belong, or skip them for now."
+              title="Missing location inbox"
+              scale={scale}
+            />
+          </View>
 
-        <Text className="mt-6 font-extrabold" style={{ fontSize: s(18), color: colors.text.strong }}>Missing GPS inbox</Text>
-        <View className="mt-3" style={{ gap: s(12) }}>
-          {trip.missingGpsMedia.length === 0 ? (
-            <View className="rounded-3xl p-4" style={{ backgroundColor: colors.surface.soft }}>
-              <Text className="font-bold" style={{ fontSize: s(13), color: colors.text.muted }}>No unplaced media left. Ignored media will stay out of the public trip.</Text>
-            </View>
-          ) : trip.missingGpsMedia.map((media) => (
-            <View key={media.id} className="flex-row rounded-3xl bg-white p-3" style={{ borderWidth: 1, borderColor: colors.surface.cardBorder, gap: s(12) }}>
-              <Image source={{ uri: media.uri }} resizeMode="cover" className="rounded-2xl" style={{ width: s(88), height: s(88), backgroundColor: colors.surface.muted }} />
-              <View className="flex-1">
-                <Text className="font-extrabold" style={{ fontSize: s(12), color: colors.text.strong }}>{media.description}</Text>
-                <Text className="mt-1 font-semibold" style={{ fontSize: s(11), color: colors.map.missing }}>No GPS location</Text>
-                <View className="mt-3 flex-row" style={{ gap: s(8) }}>
-                  <SmallAction label="Add here" scale={scale} onPress={() => moveMissingMediaToNode(media)} />
-                  <SmallAction label="Skip" scale={scale} muted onPress={() => skipMissingMedia(media.id)} />
-                </View>
+          <View
+            className="mt-4 rounded-[24px] bg-[#F6F4F8]"
+            style={{ padding: s(14) }}>
+            <Text
+              className="font-semibold"
+              style={{ fontSize: s(12), color: colors.text.muted }}>
+              Selected highlight
+            </Text>
+            <Text
+              className="mt-1 font-extrabold"
+              style={{ fontSize: s(16), color: colors.text.primary }}>
+              {selectedNode?.title ?? "No highlight selected"}
+            </Text>
+            <Text
+              className="mt-2 font-semibold"
+              style={{ fontSize: s(11), color: colors.text.muted }}>
+              {skippedMissingCount > 0
+                ? `${skippedMissingCount} skipped item${skippedMissingCount === 1 ? "" : "s"} will stay off-map until you revisit them.`
+                : "Skipped items stay out of the public trip until you place them."}
+            </Text>
+          </View>
+
+          <View style={{ marginTop: s(14), gap: s(12) }}>
+            {unresolvedMissingMedia.length === 0 ? (
+              <View
+                className="rounded-[24px] bg-white"
+                style={{
+                  padding: s(16),
+                  borderWidth: 1,
+                  borderColor: colors.surface.cardBorder,
+                }}>
+                <Text
+                  className="font-extrabold"
+                  style={{ fontSize: s(14), color: colors.text.primary }}>
+                  All unresolved photos are handled.
+                </Text>
+                <Text
+                  className="mt-2 font-semibold"
+                  style={{
+                    fontSize: s(12),
+                    lineHeight: s(18),
+                    color: colors.text.muted,
+                  }}>
+                  You can keep refining highlight order, or open a highlight to
+                  tighten its photo sequence.
+                </Text>
               </View>
-            </View>
-          ))}
-        </View>
+            ) : (
+              unresolvedMissingMedia.map((media) => (
+                <View
+                  key={media.id}
+                  className="flex-row rounded-[24px] bg-white"
+                  style={{
+                    padding: s(12),
+                    borderWidth: 1,
+                    borderColor: colors.surface.cardBorder,
+                    gap: s(12),
+                  }}>
+                  <Image
+                    source={{ uri: media.uri }}
+                    resizeMode="cover"
+                    className="rounded-[18px]"
+                    style={{
+                      width: s(84),
+                      height: s(84),
+                      backgroundColor: colors.surface.muted,
+                    }}
+                  />
+                  <View className="flex-1">
+                    <Text
+                      className="font-extrabold"
+                      style={{ fontSize: s(12), color: colors.text.primary }}>
+                      {media.description || "Untitled media"}
+                    </Text>
+                    <Text
+                      className="mt-2 font-semibold"
+                      style={{ fontSize: s(11), color: colors.map.missing }}>
+                      No GPS. Add it to the selected highlight or leave it
+                      off-map.
+                    </Text>
+                    <View className="mt-3 flex-row" style={{ gap: s(8) }}>
+                      <ActionButton
+                        title="Add here"
+                        tone="ghost"
+                        onPress={() => moveMissingMediaToNode(media)}
+                        scale={scale}
+                      />
+                      <ActionButton
+                        title="Skip"
+                        tone="soft"
+                        onPress={() => skipMissingMedia(media.id)}
+                        scale={scale}
+                      />
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        </EditSheet>
       </ScrollView>
     </View>
   );
 }
 
-type EditPillProps = {
-  label: string;
-  scale: number;
-  onPress: () => void;
-};
+function moveListItem<T>(items: T[], fromIndex: number, toIndex: number) {
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(fromIndex, 1);
 
-function EditPill({ label, scale, onPress }: EditPillProps) {
-  const s = (value: number) => value * scale;
+  nextItems.splice(toIndex, 0, movedItem!);
 
-  return (
-    <Pressable accessibilityRole="button" className="items-center justify-center rounded-full" style={{ minHeight: s(34), paddingHorizontal: s(13), backgroundColor: colors.brand.secondary }} onPress={onPress}>
-      <Text className="font-extrabold" style={{ fontSize: s(11), color: colors.text.inverse }}>{label}</Text>
-    </Pressable>
-  );
+  return nextItems;
 }
 
-type SmallActionProps = EditPillProps & {
-  muted?: boolean;
-};
-
-function SmallAction({ label, scale, muted, onPress }: SmallActionProps) {
-  const s = (value: number) => value * scale;
-
-  return (
-    <Pressable accessibilityRole="button" className="items-center justify-center rounded-full" style={{ minHeight: s(30), paddingHorizontal: s(11), backgroundColor: muted ? colors.surface.soft : colors.text.primary }} onPress={onPress}>
-      <Text className="font-extrabold" style={{ fontSize: s(10), color: muted ? colors.text.primary : colors.text.inverse }}>{label}</Text>
-    </Pressable>
+function rebuildRouteSegments(
+  nodes: TripNode[],
+  previousSegments: RouteSegment[],
+) {
+  const transportByPair = new Map(
+    previousSegments.map((segment) => [
+      `${segment.fromNodeId}:${segment.toNodeId}`,
+      segment.transport,
+    ]),
   );
+
+  return nodes.slice(1).map((node, index) => {
+    const previousNode = nodes[index]!;
+    const key = `${previousNode.id}:${node.id}`;
+    const reverseKey = `${node.id}:${previousNode.id}`;
+
+    return {
+      id: `segment-${previousNode.id}-${node.id}`,
+      fromNodeId: previousNode.id,
+      toNodeId: node.id,
+      transport:
+        transportByPair.get(key) ?? transportByPair.get(reverseKey) ?? "none",
+    };
+  });
 }

@@ -1,4 +1,5 @@
-import { useWindowDimensions, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
+import { ActivityIndicator, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ImmersiveStoryCard } from "@/components/trip-view/ImmersiveStoryCard";
@@ -7,15 +8,45 @@ import { TripViewOverlay } from "@/components/trip-view/TripViewOverlay";
 import { useTripViewState } from "@/components/trip-view/useTripViewState";
 import { TripMap } from "@/components/wanderable/TripMap";
 import { wanderableTheme } from "@/constants/wanderableTheme";
+import { useTripViewData } from "@/lib/trips/hooks";
 const { colors } = wanderableTheme;
 
 export default function TripViewScreen() {
+  const { tripId } = useLocalSearchParams<{ tripId?: string }>();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / 375, height / 812);
   const s = (value: number) => value * scale;
   const canvasLeft = (width - s(375)) / 2;
-  const tripView = useTripViewState();
+  const tripQuery = useTripViewData(tripId);
+  const tripView = useTripViewState(tripQuery.data ?? null);
+
+  if (tripQuery.isLoading) {
+    return (
+      <TripViewStatus
+        body="Pulling your trip, stories, and map route from Supabase."
+        title="Loading trip"
+      />
+    );
+  }
+
+  if (tripQuery.error) {
+    return (
+      <TripViewStatus
+        body="We couldn't load this trip right now. Check the seeded data or try again after syncing Supabase."
+        title="Trip unavailable"
+      />
+    );
+  }
+
+  if (!tripView.trip || !tripView.activeNode) {
+    return (
+      <TripViewStatus
+        body="This account does not have a mapped trip yet. Seed the database first, then reopen the trip view."
+        title="No trip found"
+      />
+    );
+  }
 
   return (
     <View
@@ -47,48 +78,66 @@ export default function TripViewScreen() {
           routeSegments={tripView.trip.routeSegments}
           scale={scale}
           selectedZoomLabel={tripView.selectedZoomLabel}
+          tripDays={tripView.trip.days}
           onSelectNode={tripView.goToNode}
         />
       </View>
 
       <TripViewOverlay
         activeIndex={tripView.activeIndex}
-        activeMediaUri={tripView.activeMedia.uri}
-        activeNode={tripView.activeNode}
+        activeMediaUri={tripView.activeMedia?.uri ?? null}
         canvasLeft={canvasLeft}
         scale={scale}
-        selectedDayId={tripView.selectedDayId}
         top={insets.top + s(58)}
         trip={tripView.trip}
+        viewportWidth={width}
         zoomIndex={tripView.zoomIndex}
-        onDayPress={tripView.goToDay}
         onNodePress={tripView.goToNode}
+        onNodeSnap={tripView.goToNodeByIndex}
         onOpenStory={tripView.openStory}
-        onSelectAllDays={() => tripView.setSelectedDayId("all")}
         onZoomPress={tripView.setZoomIndex}
-        onPreviousNode={tripView.goToPreviousNode}
-        onNextNode={tripView.goToNextNode}
       />
 
       {tripView.isStoryOpen ? (
         <View
           className="absolute"
           style={{
-            top: insets.top + s(78),
-            left: canvasLeft + s(23),
-            width: s(329),
-            bottom: s(19),
+            top: insets.top + s(58),
+            left: canvasLeft + s(10),
+            right: canvasLeft + s(10),
+            bottom: s(12),
             zIndex: 20,
           }}>
           <ImmersiveStoryCard
+            key={tripView.activeNode.id}
             node={tripView.activeNode}
             scale={scale}
             onClose={tripView.closeStory}
-            onPrevious={tripView.goToPreviousNode}
-            onNext={tripView.goToNextNode}
+            onPrevious={tripView.goToPreviousStoryNode}
+            onNext={tripView.goToNextStoryNode}
           />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function TripViewStatus({ body, title }: { body: string; title: string }) {
+  return (
+    <View
+      className="flex-1 items-center justify-center px-8"
+      style={{ backgroundColor: colors.background.surface }}>
+      <ActivityIndicator color={colors.brand.secondary} />
+      <Text
+        className="mt-6 font-extrabold"
+        style={{ fontSize: 22, color: colors.text.strong }}>
+        {title}
+      </Text>
+      <Text
+        className="mt-3 text-center font-semibold"
+        style={{ fontSize: 13, lineHeight: 19, color: colors.text.muted }}>
+        {body}
+      </Text>
     </View>
   );
 }

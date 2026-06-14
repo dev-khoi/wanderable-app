@@ -5,8 +5,9 @@ import { wanderableTheme } from "@/constants/wanderableTheme";
 import {
   type RouteSegment,
   type TransportMode,
+  type TripDay,
   type TripNode,
-} from "@/lib/mockData";
+} from "@/lib/trips/types";
 
 const { colors } = wanderableTheme;
 const mapboxAccessToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
@@ -23,17 +24,23 @@ const transportLabels: Record<TransportMode, string> = {
 };
 
 type RNMapboxModule = typeof import("@rnmapbox/maps");
+let cachedMapboxModule: RNMapboxModule | null | undefined;
 
 function getMapboxModule(): RNMapboxModule | null {
+  if (cachedMapboxModule !== undefined) {
+    return cachedMapboxModule;
+  }
+
   try {
-    const module = require("@rnmapbox/maps") as RNMapboxModule;
+    cachedMapboxModule = require("@rnmapbox/maps") as RNMapboxModule;
 
     if (mapboxAccessToken) {
-      module.setAccessToken(mapboxAccessToken);
+      cachedMapboxModule.setAccessToken(mapboxAccessToken);
     }
 
-    return module;
+    return cachedMapboxModule;
   } catch {
+    cachedMapboxModule = null;
     return null;
   }
 }
@@ -46,6 +53,7 @@ export type TripMapProps = {
   routeSegments: RouteSegment[];
   scale: number;
   selectedZoomLabel: string;
+  tripDays: TripDay[];
   onSelectNode: (nodeId: string) => void;
 };
 
@@ -57,11 +65,9 @@ export function TripMapMapbox({
   routeSegments,
   scale,
   selectedZoomLabel,
+  tripDays,
   onSelectNode,
 }: TripMapProps) {
-  if (!mapboxAccessToken) {
-    return <Text>Error</Text>;
-  }
   const Mapbox = getMapboxModule();
   const hasAppliedInitialCenterRef = useRef(false);
   const cameraRef = useRef<any>(null);
@@ -114,6 +120,9 @@ export function TripMapMapbox({
       },
     } as const;
   }, [nodeById, routeSegments]);
+  const dayNumberByDayId = useMemo(() => {
+    return new Map(tripDays.map((day, index) => [day.id, index + 1]));
+  }, [tripDays]);
 
   useEffect(() => {
     if (!Mapbox) {
@@ -281,6 +290,7 @@ export function TripMapMapbox({
         {nodes.map((node) => {
           const isActive = node.id === activeNodeId;
           const size = isActive ? 58 * scale : 44 * scale;
+          const dayNumber = dayNumberByDayId.get(node.dayId) ?? 1;
 
           return (
             <MarkerView
@@ -305,18 +315,31 @@ export function TripMapMapbox({
                     opacity: isActive ? 0.24 : 0.88,
                   }}
                 />
-                <Image
-                  source={{ uri: node.media[0]?.uri }}
-                  resizeMode="cover"
-                  style={{
-                    width: size * 0.74,
-                    height: size * 0.74,
-                    borderRadius: size * 0.37,
-                    borderWidth: 3 * scale,
-                    borderColor: colors.map.pinBorder,
-                    backgroundColor: colors.surface.muted,
-                  }}
-                />
+                {node.media[0]?.uri ? (
+                  <Image
+                    source={{ uri: node.media[0].uri }}
+                    resizeMode="cover"
+                    style={{
+                      width: size * 0.74,
+                      height: size * 0.74,
+                      borderRadius: size * 0.37,
+                      borderWidth: 3 * scale,
+                      borderColor: colors.map.pinBorder,
+                      backgroundColor: colors.surface.muted,
+                    }}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: size * 0.74,
+                      height: size * 0.74,
+                      borderRadius: size * 0.37,
+                      borderWidth: 3 * scale,
+                      borderColor: colors.map.pinBorder,
+                      backgroundColor: colors.surface.muted,
+                    }}
+                  />
+                )}
                 <View
                   className="absolute items-center justify-center"
                   style={{
@@ -332,7 +355,7 @@ export function TripMapMapbox({
                   <Text
                     className="font-extrabold"
                     style={{ fontSize: 8 * scale, color: colors.text.inverse }}>
-                    {node.photoCount}
+                    {dayNumber}
                   </Text>
                 </View>
               </Pressable>

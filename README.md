@@ -246,65 +246,62 @@ This is the most important conversion screen in the app.
 |----------------------------------|
 |                                  |
 |         [Interactive Map]        |
-|   route line + nodes + pins      |
+| route line + highlights + pins   |
 |                                  |
 |                                  |
 |----------------------------------|
-| Day 3: Kyoto          [Edit]     |
-| [Day chips: 1][2][3][4][All]     |
+| Highlight: Kyoto Walk  [Edit]    |
+| [Highlight swipe rail]           |
 |                                  |
-| Timeline scrubber  o----o---o    |
+| Swipe highlights  o----o---o     |
 |                                  |
-| Active node preview card         |
-| Photo | Fushimi Inari | 4:20 PM  |
-| Voice note / blog snippet        |
+| Active highlight preview         |
+| Cover | Kyoto Walk | Mar 19      |
+| Story snippet / location         |
 +----------------------------------+
 ```
 
 ### Must-have elements
 
-- route line between nodes
-- node pins sized/colored by photo count
-- day selector
-- timeline scrubber
-- active node preview
+- route line between highlights
+- highlight pins or anchors on the map
+- horizontal highlight swipe behavior
+- active highlight preview
 - share CTA
 - edit CTA
 
 ---
 
-## 7. Node detail bottom sheet / card
+## 7. Highlight story viewer
 
-**Goal:** primary editing and storytelling unit.
+**Goal:** primary storytelling unit layered on top of the map.
 
 ```text
 +----------------------------------+
 | [drag handle]                    |
-| [photo carousel]                 |
+| [story media]                    |
 |                                  |
-| Fushimi Inari Shrine [Rename]    |
-| 4:10 PM - 5:30 PM                |
-| [mini map thumbnail]             |
+| Kyoto Walk                       |
+| Mar 19 • Kyoto                   |
+| [mini map context]               |
 |                                  |
-| Blog entry                       |
+| Story title / description        |
 | "We got here before sunset..."  |
 |                                  |
-| [Play voice note]                |
-|                                  |
-| [Merge] [Split] [Move Photos]    |
-| [Transport icon: Walk v]         |
+| Tap left = previous story        |
+| Tap right = next story           |
+| Hold = pause                     |
+| Swipe = next highlight           |
 +----------------------------------+
 ```
 
-### Node requirements
+### Highlight/story requirements
 
-- multiple photos per node
-- photos sorted ascending by time
-- one location per node
-- editable node name
-- blog entry per node
-- voice note per node
-- transport type between nodes
+- highlight is the map-following unit
+- a highlight contains many stories
+- a story contains media plus title, description, location, and date context
+- photos and videos are supported in v1
+- swiping between highlights updates the map automatically
 
 ---
 
@@ -394,9 +391,9 @@ This is the most important conversion screen in the app.
 | Share Trip                       |
 |                                  |
 | [Public Trip Link]               |
-| [Instagram Story Export]         |
+| [Highlight Share Card]           |
 | [Copy Link]                      |
-| [Download Cover Card]            |
+| [Download Trip Preview]          |
 +----------------------------------+
 ```
 
@@ -410,16 +407,15 @@ This is the most important conversion screen in the app.
 +----------------------------------+
 | Trip title + cover               |
 | Route map                        |
-| Day breakdown                    |
-| Node cards with photos           |
-| Blog entries                     |
-| Voice note players               |
+| Highlight sequence               |
+| Story viewer                     |
+| Story text and media             |
 +----------------------------------+
 ```
 
 ---
 
-## 13. Instagram export card
+## 13. Highlight share card
 
 **Goal:** a lightweight, aesthetic summary for sharing.
 
@@ -427,9 +423,9 @@ This is the most important conversion screen in the app.
 +----------------------------------+
 | Trip cover / mini route          |
 | Japan 2024                       |
-| 8 days • 642 km                  |
-| Kyoto • Osaka • Tokyo            |
-| Key memories                     |
+| Kyoto Walk                       |
+| Story preview                    |
+| Shareable trip artifact          |
 | Wanderable                       |
 +----------------------------------+
 ```

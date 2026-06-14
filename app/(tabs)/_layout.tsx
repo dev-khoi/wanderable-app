@@ -31,11 +31,16 @@ export default function TabLayout() {
           name="autoscan"
           options={{ animation: 'fade_from_bottom' }}
         />
+        
         <Stack.Screen name="trip-card" options={{ animation: 'fade' }} />
         <Stack.Screen name="trip-view" options={{ animation: 'fade' }} />
         <Stack.Screen
           name="trip-edit"
           options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="highlight-edit"
+          options={{ animation: 'slide_from_right' }}
         />
       </Stack.Protected>
     </Stack>
