@@ -80,9 +80,7 @@ export default function OnboardingScreen() {
           }}>
           {"Recreate trip\nfrom your photos"}
         </Text> */}
-        <Pressable onPress={() => router.push(AUTH_SIGN_IN_ROUTE)}>
-          <Text>devmode skp</Text>
-        </Pressable>
+
         <PrimaryButton
           title="Get Started"
           scale={scale}

@@ -30,6 +30,7 @@ export function TripMapMapbox({
   coverImageUri,
   initialCenterCoordinate,
   lockGlobe = false,
+  mapContentTranslateY = 0,
   markerVariant = "detailed",
   nodes,
   routeSegments,
@@ -185,7 +186,7 @@ export function TripMapMapbox({
   return (
     <View style={{ flex: 1 }}>
       <MapView
-        style={{ flex: 1 }}
+        style={{ flex: 1, transform: [{ translateY: mapContentTranslateY }] }}
         styleURL={StyleURL.SatelliteStreet}
         projection="globe"
         compassEnabled={false}
@@ -196,6 +197,7 @@ export function TripMapMapbox({
         pitchEnabled={!lockGlobe && !isGlobeOverview}
         scrollEnabled={canSpinLockedGlobe || !lockGlobe}
         zoomEnabled={!lockGlobe}
+        
         onCameraChanged={(state) => {
           const nextZoom = state.properties.zoom;
 
@@ -213,6 +215,7 @@ export function TripMapMapbox({
           }
           pitch={lockGlobe ? 0 : 48}
           heading={lockGlobe ? 0 : 12}
+
         />
         <TripMapRouteLayer
           Mapbox={Mapbox}
@@ -239,7 +242,9 @@ export function TripMapMapbox({
         />
       </MapView>
 
-      {isGlobeOverview ? <TripMapGlobeOverlay scale={scale} /> : null}
+      {isGlobeOverview ? (
+        <TripMapGlobeOverlay scale={scale} translateY={mapContentTranslateY} />
+      ) : null}
     </View>
   );
 }

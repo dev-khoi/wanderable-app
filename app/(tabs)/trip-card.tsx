@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useMemo } from "react";
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -16,7 +16,7 @@ import {
 } from "@/components/trip-card";
 import { TripMap } from "@/components/wanderable/TripMap";
 import { wanderableTheme } from "@/constants/wanderableTheme";
-import { useTripSummaries } from "@/lib/trips/hooks";
+import { useDeleteTrip, useTripSummaries } from "@/lib/trips/hooks";
 
 const { colors } = wanderableTheme;
 const SHEET_SPRING = {
@@ -37,6 +37,7 @@ export default function TripCardScreen() {
   const scale = Math.min(width / 375, height / 812);
   const s = (value: number) => value * scale;
   const tripsQuery = useTripSummaries();
+  const deleteTripMutation = useDeleteTrip();
   const trips = tripsQuery.data ?? [];
   const expandedTop = insets.top + s(88);
   const defaultTop = Math.max(insets.top + s(136), height * 0.3);
@@ -73,6 +74,22 @@ export default function TripCardScreen() {
       pathname: "/trip-view",
       params: { tripId: targetTripId },
     });
+  };
+
+  const confirmDeleteTrip = (tripId: string, tripTitle: string) => {
+    Alert.alert("Delete trip?", tripTitle, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          deleteTripMutation.mutate({ tripId });
+        },
+      },
+    ]);
   };
 
   const gesture = Gesture.Pan()
@@ -223,6 +240,8 @@ export default function TripCardScreen() {
                   active
                   cardWidth={cardWidth}
                   isFirst
+                  isDeleting={deleteTripMutation.isPending}
+                  onDelete={() => confirmDeleteTrip(trip.id, trip.title)}
                   scale={scale}
                   spacing={0}
                   trip={trip}

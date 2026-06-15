@@ -72,7 +72,7 @@ export default function TripViewScreen() {
       <View
         style={{
           position: "absolute",
-          top: insets.top + s(44),
+          top: insets.top + s(54),
           left: canvasLeft + s(2),
           width: s(371),
           height: height - insets.top - s(44),
@@ -84,6 +84,7 @@ export default function TripViewScreen() {
           allNodes={tripView.trip.nodes}
           coverImageUri={tripView.trip.coverUri}
           initialCenterCoordinate={tripView.mapInitialCenterCoordinate}
+          mapContentTranslateY={-s(98)}
           nodes={tripView.trip.nodes}
           routeSegments={tripView.trip.routeSegments}
           scale={scale}
