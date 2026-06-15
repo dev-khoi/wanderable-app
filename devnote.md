@@ -8,7 +8,12 @@ https://chatgpt.com/c/6a2d6afd-1890-83ea-bbaf-2d06682bc224
 
 adb -s emulator-5554 uninstall com.khoilikereact.wanderable
 
-business model: I want this to be more instagrammy but follow polarsttep busines modal 1 trip (or post but dont really use post) many highlights many stories each story contains media (photo, video, audio) and text (description, title, location, date) like a journal
+business model: 
+I want this to be more instagrammy but follow polarsttep busines modal 
+1 trip (or post but dont really use post) 
+    many highlights/nodes
+        many stories each story contains 
+            media (photo, video, audio) and text (description, title, location, date) like a journal
 
 this derives the UI: no need for the d1, d2 ,d3 to keep track of the highlight,
 
@@ -25,4 +30,12 @@ media types: photos + video, no need for cap of maxiumum puload
 Core Metadata Included:Time & Location: Exact date, time, and a geotagged map of where the media was shot (unless disabled in privacy settings). so from that core metadata, we want the user to be able to upload, and our algorithm will understand
 
 I want it to have smooth animation
+
+
+
+- car
+- bike
+- walk
+- fly
+- none
 

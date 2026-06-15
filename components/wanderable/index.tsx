@@ -310,6 +310,7 @@ type TripSummaryCardProps = ScaledProps & {
   distanceLabel?: string;
   durationLabel?: string;
   locationLabel?: string;
+  onCoverPress?: () => void;
   title?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -320,6 +321,7 @@ export function TripSummaryCard({
   distanceLabel = "0 km",
   durationLabel = "0 days",
   locationLabel = "Unknown location",
+  onCoverPress,
   title = "Untitled trip",
   scale,
   style,
@@ -343,63 +345,69 @@ export function TripSummaryCard({
         },
         style,
       ]}>
-      {coverUri ? (
-        <Image
-          source={{ uri: coverUri }}
-          resizeMode="cover"
-          style={{
-            position: "absolute",
-            top: s(12),
-            left: s(12),
-            width: s(292),
-            height: s(334),
-            borderRadius: s(12),
-          }}
-        />
-      ) : (
-        <View
-          className="absolute"
-          style={{
-            top: s(12),
-            left: s(12),
-            width: s(292),
-            height: s(334),
-            borderRadius: s(12),
-            backgroundColor: colors.surface.muted,
-          }}
-        />
-      )}
-      <View
-        className="absolute"
+      <Pressable
+        accessibilityRole={onCoverPress ? "button" : undefined}
+        onPress={onCoverPress}
         style={{
+          position: "absolute",
           top: s(12),
           left: s(12),
           width: s(292),
           height: s(334),
           borderRadius: s(12),
-          backgroundColor: "rgba(16, 19, 32, 0.18)",
-        }}
-      />
-      <Text
-        className="absolute font-extrabold"
-        style={{
-          top: s(232),
-          left: s(23),
-          fontSize: s(24),
-          lineHeight: s(29),
-          color: colors.text.inverse,
+          overflow: "hidden",
         }}>
-        {title}
-      </Text>
+        {coverUri ? (
+          <Image
+            source={{ uri: coverUri }}
+            resizeMode="cover"
+            style={{ width: "100%", height: "100%" }}
+          />
+        ) : (
+          <View
+            style={{
+              width: "100%",
+              height: "100%",
+              backgroundColor: colors.surface.muted,
+            }}
+          />
+        )}
+        <View
+          className="absolute"
+          style={{
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(16, 19, 32, 0.18)",
+          }}
+        />
+      </Pressable>
       <View
-        className="absolute flex-row items-center"
-        style={{ top: s(241), right: s(22) }}>
-        <WanderableMark size={s(12)} style={{ marginRight: s(4) }} />
+        className="absolute"
+        style={{
+          top: s(220),
+          left: s(23),
+          right: s(23),
+        }}
+      >
         <Text
-          className="font-semibold"
-          style={{ fontSize: s(12), color: colors.text.inverse }}>
-          {locationLabel}
+          className="font-extrabold"
+          style={{
+            fontSize: s(24),
+            lineHeight: s(29),
+            color: colors.text.inverse,
+          }}>
+          {title}
         </Text>
+        <View className="mt-2 flex-row items-center">
+          <WanderableMark size={s(12)} style={{ marginRight: s(4) }} />
+          <Text
+            className="font-semibold"
+            style={{ fontSize: s(12), color: colors.text.inverse }}>
+            {locationLabel}
+          </Text>
+        </View>
       </View>
       <View
         className="absolute flex-row items-center"

@@ -1,70 +1,41 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Image, Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 
-import { wanderableTheme } from "@/constants/wanderableTheme";
+import type { TripNode } from "@/lib/trips/types";
+
 import {
-  type RouteSegment,
-  type TransportMode,
-  type TripDay,
-  type TripNode,
-} from "@/lib/trips/types";
-
-const { colors } = wanderableTheme;
-const mapboxAccessToken = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
-const CITY_ZOOM_LEVEL = 8.8;
-const GLOBE_OVERVIEW_ZOOM_LEVEL = 0.6;
-const GLOBE_ROTATION_LOCK_ZOOM_LEVEL = 1.2;
-
-const transportLabels: Record<TransportMode, string> = {
-  car: "car",
-  bike: "bike",
-  walk: "walk",
-  fly: "fly",
-  none: "",
-};
-
-type RNMapboxModule = typeof import("@rnmapbox/maps");
-let cachedMapboxModule: RNMapboxModule | null | undefined;
-
-function getMapboxModule(): RNMapboxModule | null {
-  if (cachedMapboxModule !== undefined) {
-    return cachedMapboxModule;
-  }
-
-  try {
-    cachedMapboxModule = require("@rnmapbox/maps") as RNMapboxModule;
-
-    if (mapboxAccessToken) {
-      cachedMapboxModule.setAccessToken(mapboxAccessToken);
-    }
-
-    return cachedMapboxModule;
-  } catch {
-    cachedMapboxModule = null;
-    return null;
-  }
-}
-
-export type TripMapProps = {
-  activeNodeId: string;
-  allNodes: TripNode[];
-  initialCenterCoordinate?: [number, number] | null;
-  nodes: TripNode[];
-  routeSegments: RouteSegment[];
-  scale: number;
-  selectedZoomLabel: string;
-  tripDays: TripDay[];
-  onSelectNode: (nodeId: string) => void;
-};
+  CITY_ZOOM_LEVEL,
+  GLOBE_OVERVIEW_ZOOM_LEVEL,
+  GLOBE_ROTATION_LOCK_ZOOM_LEVEL,
+  mapboxAccessToken,
+} from "./trip-map-mapbox/constants";
+import {
+  buildDayNumberByDayId,
+  buildRouteLines,
+  buildRouteShape,
+  buildTripCenterCoordinate,
+} from "./trip-map-mapbox/geometry";
+import { getMapboxModule } from "./trip-map-mapbox/useMapboxModule";
+import { TripMapGlobeOverlay } from "./trip-map-mapbox/TripMapGlobeOverlay";
+import { TripMapNodes } from "./trip-map-mapbox/TripMapNodes";
+import { TripMapRouteLabels } from "./trip-map-mapbox/TripMapRouteLabels";
+import { TripMapRouteLayer } from "./trip-map-mapbox/TripMapRouteLayer";
+import { TripMapStatusScreen } from "./trip-map-mapbox/TripMapStatusScreen";
+import type { TripMapProps } from "./trip-map-mapbox/types";
 
 export function TripMapMapbox({
   activeNodeId,
   allNodes,
+  allowGlobeSpin = false,
+  coverImageUri,
   initialCenterCoordinate,
+  lockGlobe = false,
+  markerVariant = "detailed",
   nodes,
   routeSegments,
   scale,
   selectedZoomLabel,
+  showRouteLabels = true,
   tripDays,
   onSelectNode,
 }: TripMapProps) {
@@ -73,56 +44,38 @@ export function TripMapMapbox({
   const cameraRef = useRef<any>(null);
   const wasGlobeOverviewRef = useRef(false);
   const [currentZoom, setCurrentZoom] = useState(CITY_ZOOM_LEVEL);
-  const nodeById = useMemo(
-    () => new Map(allNodes.map((node) => [node.id, node])),
+  const safeAllNodes = useMemo(
+    () => allNodes.filter((node): node is TripNode => !!node),
     [allNodes],
   );
+  const safeNodes = useMemo(
+    () => nodes.filter((node): node is TripNode => !!node),
+    [nodes],
+  );
+  const safeRouteSegments = useMemo(
+    () => routeSegments.filter(Boolean),
+    [routeSegments],
+  );
+  const safeTripDays = useMemo(() => tripDays.filter(Boolean), [tripDays]);
+  const nodeById = useMemo(
+    () => new Map(safeAllNodes.map((node) => [node.id, node])),
+    [safeAllNodes],
+  );
+  const dayNumberByDayId = useMemo(
+    () => buildDayNumberByDayId(safeTripDays),
+    [safeTripDays],
+  );
+  const routeLines = useMemo(
+    () => buildRouteLines(safeRouteSegments, nodeById),
+    [nodeById, safeRouteSegments],
+  );
+  const routeShape = useMemo(() => buildRouteShape(routeLines), [routeLines]);
+  const tripCenterCoordinate = useMemo(
+    () => buildTripCenterCoordinate(safeAllNodes),
+    [safeAllNodes],
+  );
   const isGlobeOverview = currentZoom <= GLOBE_ROTATION_LOCK_ZOOM_LEVEL;
-  const tripCenterCoordinate = useMemo<[number, number]>(() => {
-    if (allNodes.length === 0) {
-      return [0, 20];
-    }
-
-    const [totalLongitude, totalLatitude] = allNodes.reduce(
-      ([longitude, latitude], node) => [
-        longitude + node.coordinate[0],
-        latitude + node.coordinate[1],
-      ],
-      [0, 0],
-    );
-
-    return [
-      totalLongitude / allNodes.length,
-      totalLatitude / allNodes.length,
-    ];
-  }, [allNodes]);
-
-  const routeShape = useMemo(() => {
-    const coordinates = routeSegments
-      .map((segment) => nodeById.get(segment.fromNodeId)?.coordinate)
-      .filter(Boolean) as [number, number][];
-    const lastCoordinate =
-      routeSegments.length > 0
-        ? nodeById.get(routeSegments[routeSegments.length - 1]?.toNodeId)
-            ?.coordinate
-        : undefined;
-
-    if (lastCoordinate) {
-      coordinates.push(lastCoordinate);
-    }
-
-    return {
-      type: "Feature",
-      properties: {},
-      geometry: {
-        type: "LineString",
-        coordinates,
-      },
-    } as const;
-  }, [nodeById, routeSegments]);
-  const dayNumberByDayId = useMemo(() => {
-    return new Map(tripDays.map((day, index) => [day.id, index + 1]));
-  }, [tripDays]);
+  const canSpinLockedGlobe = lockGlobe && allowGlobeSpin && isGlobeOverview;
 
   useEffect(() => {
     if (!Mapbox) {
@@ -130,13 +83,9 @@ export function TripMapMapbox({
     }
 
     const activeNode =
-      allNodes.find((node) => node.id === activeNodeId) ?? allNodes[0];
+      safeAllNodes.find((node) => node.id === activeNodeId) ?? safeAllNodes[0];
 
-    if (!activeNode) {
-      return;
-    }
-
-    if (selectedZoomLabel === "Globe") {
+    if (selectedZoomLabel === "Globe" || lockGlobe) {
       cameraRef.current?.setCamera({
         centerCoordinate: tripCenterCoordinate,
         zoomLevel: GLOBE_OVERVIEW_ZOOM_LEVEL,
@@ -145,6 +94,10 @@ export function TripMapMapbox({
         animationMode: "flyTo",
         animationDuration: 1200,
       });
+      return;
+    }
+
+    if (!activeNode) {
       return;
     }
 
@@ -184,8 +137,9 @@ export function TripMapMapbox({
   }, [
     Mapbox,
     activeNodeId,
-    allNodes,
+    safeAllNodes,
     initialCenterCoordinate,
+    lockGlobe,
     selectedZoomLabel,
     tripCenterCoordinate,
   ]);
@@ -209,40 +163,24 @@ export function TripMapMapbox({
 
   if (!mapboxAccessToken) {
     return (
-      <View
-        className="flex-1 items-center justify-center px-6"
-        style={{ backgroundColor: colors.background.deepSpace }}>
-        <Text
-          className="text-center font-extrabold"
-          style={{ fontSize: 18 * scale, color: colors.text.inverse }}>
-          Add EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN to use the real Mapbox trip view.
-        </Text>
-      </View>
+      <TripMapStatusScreen
+        scale={scale}
+        title="Add EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN to use the real Mapbox trip view."
+      />
     );
   }
 
   if (!Mapbox) {
     return (
-      <View
-        className="flex-1 items-center justify-center px-6"
-        style={{ backgroundColor: colors.background.deepSpace }}>
-        <Text
-          className="text-center font-extrabold"
-          style={{ fontSize: 18 * scale, color: colors.text.inverse }}>
-          Mapbox native code is not available in this build.
-        </Text>
-        <Text
-          className="mt-3 text-center font-semibold"
-          style={{ fontSize: 12 * scale, color: colors.text.inverse }}>
-          Use an Expo dev build after installing @rnmapbox/maps. Expo Go cannot
-          load this native module.
-        </Text>
-      </View>
+      <TripMapStatusScreen
+        scale={scale}
+        title="Mapbox native code is not available in this build."
+        body="Use an Expo dev build after installing @rnmapbox/maps. Expo Go cannot load this native module."
+      />
     );
   }
 
-  const { Camera, LineLayer, MapView, MarkerView, ShapeSource, StyleURL } =
-    Mapbox;
+  const { Camera, MapView, StyleURL } = Mapbox;
 
   return (
     <View style={{ flex: 1 }}>
@@ -254,10 +192,10 @@ export function TripMapMapbox({
         scaleBarEnabled={false}
         logoEnabled={false}
         attributionEnabled={false}
-        rotateEnabled={!isGlobeOverview}
-        pitchEnabled={!isGlobeOverview}
-        scrollEnabled
-        zoomEnabled
+        rotateEnabled={canSpinLockedGlobe || (!lockGlobe && !isGlobeOverview)}
+        pitchEnabled={!lockGlobe && !isGlobeOverview}
+        scrollEnabled={canSpinLockedGlobe || !lockGlobe}
+        zoomEnabled={!lockGlobe}
         onCameraChanged={(state) => {
           const nextZoom = state.properties.zoom;
 
@@ -268,166 +206,42 @@ export function TripMapMapbox({
         <Camera
           ref={cameraRef}
           minZoomLevel={0}
-          zoomLevel={CITY_ZOOM_LEVEL}
-          centerCoordinate={initialCenterCoordinate ?? allNodes[0]?.coordinate}
-          pitch={48}
-          heading={12}
-        />
-        {routeShape.geometry.coordinates.length >= 2 ? (
-          <ShapeSource id="trip-route-source" shape={routeShape}>
-            <LineLayer
-              id="trip-route-line"
-              style={{
-                lineColor: colors.map.route,
-                lineWidth: 4,
-                lineBlur: 0.4,
-                lineCap: "round",
-                lineJoin: "round",
-              }}
-            />
-          </ShapeSource>
-        ) : null}
-        {nodes.map((node) => {
-          const isActive = node.id === activeNodeId;
-          const size = isActive ? 58 * scale : 44 * scale;
-          const dayNumber = dayNumberByDayId.get(node.dayId) ?? 1;
-
-          return (
-            <MarkerView
-              key={node.id}
-              coordinate={node.coordinate}
-              anchor={{ x: 0.5, y: 0.5 }}
-              allowOverlap
-              allowOverlapWithPuck>
-              <Pressable
-                accessibilityRole="button"
-                className="items-center justify-center"
-                onPress={() => onSelectNode(node.id)}>
-                <View
-                  style={{
-                    position: "absolute",
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    backgroundColor: isActive
-                      ? colors.map.activePin
-                      : colors.map.inactivePin,
-                    opacity: isActive ? 0.24 : 0.88,
-                  }}
-                />
-                {node.media[0]?.uri ? (
-                  <Image
-                    source={{ uri: node.media[0].uri }}
-                    resizeMode="cover"
-                    style={{
-                      width: size * 0.74,
-                      height: size * 0.74,
-                      borderRadius: size * 0.37,
-                      borderWidth: 3 * scale,
-                      borderColor: colors.map.pinBorder,
-                      backgroundColor: colors.surface.muted,
-                    }}
-                  />
-                ) : (
-                  <View
-                    style={{
-                      width: size * 0.74,
-                      height: size * 0.74,
-                      borderRadius: size * 0.37,
-                      borderWidth: 3 * scale,
-                      borderColor: colors.map.pinBorder,
-                      backgroundColor: colors.surface.muted,
-                    }}
-                  />
-                )}
-                <View
-                  className="absolute items-center justify-center"
-                  style={{
-                    right: -2 * scale,
-                    bottom: 1 * scale,
-                    width: 18 * scale,
-                    height: 18 * scale,
-                    borderRadius: 9 * scale,
-                    backgroundColor: colors.brand.secondary,
-                    borderWidth: 2 * scale,
-                    borderColor: colors.map.pinBorder,
-                  }}>
-                  <Text
-                    className="font-extrabold"
-                    style={{ fontSize: 8 * scale, color: colors.text.inverse }}>
-                    {dayNumber}
-                  </Text>
-                </View>
-              </Pressable>
-            </MarkerView>
-          );
-        })}
-        {routeSegments.map((segment) => {
-          const fromNode = nodeById.get(segment.fromNodeId);
-          const toNode = nodeById.get(segment.toNodeId);
-          const label = transportLabels[segment.transport];
-
-          if (!fromNode || !toNode || !label) {
-            return null;
+          maxZoomLevel={lockGlobe ? GLOBE_OVERVIEW_ZOOM_LEVEL : undefined}
+          zoomLevel={lockGlobe ? GLOBE_OVERVIEW_ZOOM_LEVEL : CITY_ZOOM_LEVEL}
+          centerCoordinate={
+            initialCenterCoordinate ?? safeAllNodes[0]?.coordinate ?? tripCenterCoordinate
           }
-
-          const midpoint: [number, number] = [
-            (fromNode.coordinate[0] + toNode.coordinate[0]) / 2,
-            (fromNode.coordinate[1] + toNode.coordinate[1]) / 2,
-          ];
-
-          return (
-            <MarkerView
-              key={`${segment.id}-label`}
-              coordinate={midpoint}
-              anchor={{ x: 0.5, y: 0.5 }}
-              allowOverlap
-              allowOverlapWithPuck>
-              <View
-                className="items-center justify-center rounded-full"
-                style={{
-                  minWidth: 42 * scale,
-                  height: 24 * scale,
-                  paddingHorizontal: 8 * scale,
-                  backgroundColor: colors.surface.glass,
-                }}>
-                <Text
-                  className="font-extrabold"
-                  style={{ fontSize: 9 * scale, color: colors.text.primary }}>
-                  {label}
-                </Text>
-              </View>
-            </MarkerView>
-          );
-        })}
+          pitch={lockGlobe ? 0 : 48}
+          heading={lockGlobe ? 0 : 12}
+        />
+        <TripMapRouteLayer
+          Mapbox={Mapbox}
+          hasRoute={routeLines.length > 0}
+          markerVariant={markerVariant}
+          routeShape={routeShape}
+        />
+        <TripMapNodes
+          Mapbox={Mapbox}
+          activeNodeId={activeNodeId}
+          coverImageUri={coverImageUri}
+          dayNumberByDayId={dayNumberByDayId}
+          markerVariant={markerVariant}
+          nodes={safeNodes}
+          onSelectNode={onSelectNode}
+          scale={scale}
+        />
+        <TripMapRouteLabels
+          Mapbox={Mapbox}
+          nodeById={nodeById}
+          routeSegments={safeRouteSegments}
+          scale={scale}
+          showRouteLabels={showRouteLabels}
+        />
       </MapView>
 
-      {isGlobeOverview ? (
-        <View
-          pointerEvents="none"
-          className="absolute inset-0 items-center justify-center">
-          <View
-            style={{
-              position: "absolute",
-              width: "92%",
-              aspectRatio: 1,
-              borderRadius: 999,
-              backgroundColor: colors.map.globeGlowHalo,
-              transform: [{ scale: 1.06 }],
-            }}
-          />
-          <View
-            style={{
-              width: "86%",
-              aspectRatio: 1,
-              borderRadius: 999,
-              backgroundColor: colors.map.globeGlow,
-              borderWidth: Math.max(1, scale),
-              borderColor: colors.map.globeGlowRing,
-            }}
-          />
-        </View>
-      ) : null}
+      {isGlobeOverview ? <TripMapGlobeOverlay scale={scale} /> : null}
     </View>
   );
 }
+
+export type { TripMapProps } from "./trip-map-mapbox/types";

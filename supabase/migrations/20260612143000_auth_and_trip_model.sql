@@ -105,7 +105,6 @@ create table if not exists public.media_items (
   captured_longitude double precision,
   has_gps boolean not null default false,
   placement_status text not null default 'placed' check (placement_status in ('placed', 'missing_location', 'skipped')),
-  description text,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   constraint media_items_captured_latitude_check check (captured_latitude is null or captured_latitude between -90 and 90),

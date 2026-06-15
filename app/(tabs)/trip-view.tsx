@@ -1,5 +1,10 @@
-import { useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Text, useWindowDimensions, View } from "react-native";
+import { type Href, router, useLocalSearchParams } from "expo-router";
+import {
+  ActivityIndicator,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ImmersiveStoryCard } from "@/components/trip-view/ImmersiveStoryCard";
@@ -20,6 +25,9 @@ export default function TripViewScreen() {
   const canvasLeft = (width - s(375)) / 2;
   const tripQuery = useTripViewData(tripId);
   const tripView = useTripViewState(tripQuery.data ?? null);
+  const tripEditRoute = tripId
+    ? ({ pathname: "/trip-edit", params: { tripId } } as Href)
+    : null;
 
   if (tripQuery.isLoading) {
     return (
@@ -52,10 +60,11 @@ export default function TripViewScreen() {
     <View
       className="flex-1 "
       style={{ backgroundColor: colors.background.surface }}>
-        
       <TripViewHeader
         canvasLeft={canvasLeft}
         ownerName={tripView.trip.ownerName}
+        onRightPress={() => tripEditRoute && router.push(tripEditRoute)}
+        rightLabel="Edit trip"
         scale={scale}
         top={insets.top}
       />
@@ -73,6 +82,7 @@ export default function TripViewScreen() {
         <TripMap
           activeNodeId={tripView.activeNode.id}
           allNodes={tripView.trip.nodes}
+          coverImageUri={tripView.trip.coverUri}
           initialCenterCoordinate={tripView.mapInitialCenterCoordinate}
           nodes={tripView.trip.nodes}
           routeSegments={tripView.trip.routeSegments}
@@ -103,14 +113,15 @@ export default function TripViewScreen() {
           className="absolute"
           style={{
             top: insets.top + s(58),
-            left: canvasLeft + s(10),
-            right: canvasLeft + s(10),
+            left: 0,
+            right: 0,
             bottom: s(12),
             zIndex: 20,
           }}>
           <ImmersiveStoryCard
             key={tripView.activeNode.id}
             node={tripView.activeNode}
+            routeSegment={tripView.activeRouteSegment}
             scale={scale}
             onClose={tripView.closeStory}
             onPrevious={tripView.goToPreviousStoryNode}

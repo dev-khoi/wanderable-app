@@ -27,12 +27,12 @@ export default function TabLayout() {
       </Stack.Protected>
 
       <Stack.Protected guard={!!session}>
+        <Stack.Screen name="trip-card" options={{ animation: 'fade' }} />
         <Stack.Screen
           name="autoscan"
           options={{ animation: 'fade_from_bottom' }}
         />
-        
-        <Stack.Screen name="trip-card" options={{ animation: 'fade' }} />
+        <Stack.Screen name="trip-import" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="trip-view" options={{ animation: 'fade' }} />
         <Stack.Screen
           name="trip-edit"

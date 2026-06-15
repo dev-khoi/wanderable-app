@@ -39,6 +39,18 @@
           "backgroundColor": "#ffffff"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Wanderable to open your photo library so you can add trip photos to a highlight."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
       "expo-location",
       "expo-sqlite",
       "@rnmapbox/maps"
