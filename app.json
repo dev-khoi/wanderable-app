@@ -48,7 +48,8 @@
       [
         "expo-media-library",
         {
-          "isAccessMediaLocationEnabled": true
+          "isAccessMediaLocationEnabled": true,
+          "mediaLibraryPermission": "Allow Wanderable to access your media library so you can add trip photos to a highlight."
         }
       ],
       "expo-location",

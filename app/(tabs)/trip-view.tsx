@@ -33,6 +33,7 @@ export default function TripViewScreen() {
     return (
       <TripViewStatus
         // body="Pulling your trip, stories, and map route from Supabase."
+        body=""
         title="Loading trip"
       />
     );

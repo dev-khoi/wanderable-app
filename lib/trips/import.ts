@@ -1,6 +1,6 @@
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
-import * as MediaLibrary from 'expo-media-library';
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import * as MediaLibrary from "expo-media-library";
 
 const NODE_DISTANCE_THRESHOLD_KM = 0.5;
 const NODE_TIME_GAP_MS = 2 * 60 * 60 * 1000;
@@ -10,12 +10,12 @@ export type ImportedTripMediaDraft = {
   hasGps: boolean;
   latitude: number | null;
   longitude: number | null;
-  placementStatus: 'placed' | 'missing_location';
+  placementStatus: "placed" | "missing_location";
   remoteUrl: string;
   selectionIndex: number;
   sourceAssetId: string | null;
   takenAt: string | null;
-  type: 'photo' | 'video';
+  type: "photo" | "video";
 };
 
 export type ImportedTripNodeDraft = {
@@ -51,7 +51,9 @@ export type ImportedTripDraft = {
   totalAssetCount: number;
 };
 
-type MaybeAssetInfo = Awaited<ReturnType<typeof MediaLibrary.getAssetInfoAsync>> | null;
+type MaybeAssetInfo = Awaited<
+  ReturnType<typeof MediaLibrary.getAssetInfoAsync>
+> | null;
 
 type MutableNodeCluster = {
   dayKey: string | null;
@@ -71,16 +73,39 @@ type ResolvedLocationLabel = {
   title: string;
 };
 
+async function getAssetInfo(assetId?: string | null): Promise<MaybeAssetInfo> {
+  if (!assetId) {
+    return null;
+  }
+
+  const a = await MediaLibrary.getAssetInfoAsync(assetId, {
+    shouldDownloadFromNetwork: false,
+  });
+  console.log(a);
+
+  console.log(a);
+  return a;
+}
+
+//==================
 export async function buildTripImportDraftFromAssets(
   assets: ImagePicker.ImagePickerAsset[],
 ): Promise<ImportedTripDraft> {
   const resolvedAssets = (
-    await Promise.all(assets.map((asset, selectionIndex) => resolvePickedAsset(asset, selectionIndex)))
+    await Promise.all(
+      assets.map((asset, selectionIndex) =>
+        resolvePickedAsset(asset, selectionIndex),
+      ),
+    )
   ).sort(compareImportedMediaByTime);
 
   const locatedAssets = resolvedAssets.filter(
-    (asset): asset is ImportedTripMediaDraft & { latitude: number; longitude: number } =>
-      asset.latitude != null && asset.longitude != null,
+    (
+      asset,
+    ): asset is ImportedTripMediaDraft & {
+      latitude: number;
+      longitude: number;
+    } => asset.latitude != null && asset.longitude != null,
   );
 
   if (locatedAssets.length === 0) {
@@ -90,12 +115,12 @@ export async function buildTripImportDraftFromAssets(
       locatedAssetCount: 0,
       missingGpsMedia: resolvedAssets.map((asset) => ({
         ...asset,
-        placementStatus: 'missing_location',
+        placementStatus: "missing_location",
       })),
       missingLocationCount: resolvedAssets.length,
       startsOn: null,
-      subtitle: 'No mapped stops yet',
-      title: 'Imported trip',
+      subtitle: "No mapped stops yet",
+      title: "Imported trip",
       totalAssetCount: resolvedAssets.length,
     };
   }
@@ -105,21 +130,25 @@ export async function buildTripImportDraftFromAssets(
 
   for (const asset of resolvedAssets) {
     if (asset.latitude != null && asset.longitude != null) {
+      // console.log(asset.latitude);
+
       continue;
     }
 
     const attached = attachMissingGpsMedia(nodeClusters, asset);
-
     if (!attached) {
-      missingGpsMedia.push({ ...asset, placementStatus: 'missing_location' });
+      missingGpsMedia.push({ ...asset, placementStatus: "missing_location" });
     }
   }
 
   const finalizedDays = await finalizeDayDrafts(nodeClusters);
-  const firstKnownDay = finalizedDays.find((day) => day.dayDate)?.dayDate ?? null;
-  const lastKnownDay = [...finalizedDays].reverse().find((day) => day.dayDate)?.dayDate ?? null;
+  const firstKnownDay =
+    finalizedDays.find((day) => day.dayDate)?.dayDate ?? null;
+  const lastKnownDay =
+    [...finalizedDays].reverse().find((day) => day.dayDate)?.dayDate ?? null;
   const firstNode = finalizedDays[0]?.nodes[0] ?? null;
-  const firstLocation = firstNode?.locationName.split(',')[0]?.trim() ?? null;
+  const firstLocation = firstNode?.locationName.split(",")[0]?.trim() ?? null;
+  // console.log(missingGpsMedia);
 
   return {
     days: finalizedDays,
@@ -128,20 +157,25 @@ export async function buildTripImportDraftFromAssets(
     missingGpsMedia,
     missingLocationCount: missingGpsMedia.length,
     startsOn: firstKnownDay,
-    subtitle: firstNode?.locationName ?? 'Imported from your photo metadata',
-    title: firstLocation ? `${firstLocation} trip` : 'Imported trip',
+    subtitle: firstNode?.locationName ?? "Imported from your photo metadata",
+    title: firstLocation ? `${firstLocation} trip` : "Imported trip",
     totalAssetCount: resolvedAssets.length,
   };
 }
 
-export async function resolvePickedAssetTakenAt(asset: ImagePicker.ImagePickerAsset) {
+export async function resolvePickedAssetTakenAt(
+  asset: ImagePicker.ImagePickerAsset,
+) {
+  console.log(asset.assetId);
   const assetInfo = await getAssetInfo(asset.assetId);
 
   return getTakenAt(asset, assetInfo);
 }
 
 function buildInitialNodeClusters(
-  locatedAssets: Array<ImportedTripMediaDraft & { latitude: number; longitude: number }>,
+  locatedAssets: Array<
+    ImportedTripMediaDraft & { latitude: number; longitude: number }
+  >,
 ) {
   const clusters: MutableNodeCluster[] = [];
 
@@ -159,7 +193,10 @@ function buildInitialNodeClusters(
   return clusters;
 }
 
-function attachMissingGpsMedia(clusters: MutableNodeCluster[], asset: ImportedTripMediaDraft) {
+function attachMissingGpsMedia(
+  clusters: MutableNodeCluster[],
+  asset: ImportedTripMediaDraft,
+) {
   const assetTakenAtMs = toTimeMs(asset.takenAt);
   const assetDayKey = getDayKey(asset.takenAt);
 
@@ -187,7 +224,7 @@ function attachMissingGpsMedia(clusters: MutableNodeCluster[], asset: ImportedTr
     return false;
   }
 
-  addMediaToCluster(bestCluster, { ...asset, placementStatus: 'placed' });
+  addMediaToCluster(bestCluster, { ...asset, placementStatus: "placed" });
 
   return true;
 }
@@ -201,7 +238,7 @@ async function finalizeDayDrafts(clusters: MutableNodeCluster[]) {
     if (!activeDay || activeDayKey !== cluster.dayKey) {
       activeDay = {
         dayDate: cluster.dayKey,
-        dominantLocation: '',
+        dominantLocation: "",
         label: `Day ${dayDrafts.length + 1}`,
         nodes: [],
         sortOrder: dayDrafts.length,
@@ -212,7 +249,11 @@ async function finalizeDayDrafts(clusters: MutableNodeCluster[]) {
 
     const latitude = cluster.latitudeSum / cluster.gpsCount;
     const longitude = cluster.longitudeSum / cluster.gpsCount;
-    const labels = await resolveLocationLabel(latitude, longitude, cluster.sortOrder);
+    const labels = await resolveLocationLabel(
+      latitude,
+      longitude,
+      cluster.sortOrder,
+    );
     const nodeDraft: ImportedTripNodeDraft = {
       countryName: labels.countryName,
       daySortOrder: activeDay.sortOrder,
@@ -253,7 +294,10 @@ function createNodeCluster(
   };
 }
 
-function addMediaToCluster(cluster: MutableNodeCluster, asset: ImportedTripMediaDraft) {
+function addMediaToCluster(
+  cluster: MutableNodeCluster,
+  asset: ImportedTripMediaDraft,
+) {
   cluster.media.push(asset);
 
   if (asset.latitude != null && asset.longitude != null) {
@@ -282,7 +326,10 @@ function shouldStartNewNodeCluster(
     return true;
   }
 
-  const center: [number, number] = [cluster.longitudeSum / cluster.gpsCount, cluster.latitudeSum / cluster.gpsCount];
+  const center: [number, number] = [
+    cluster.longitudeSum / cluster.gpsCount,
+    cluster.latitudeSum / cluster.gpsCount,
+  ];
   const distanceKm = haversineKm(center, [asset.longitude, asset.latitude]);
 
   if (distanceKm > NODE_DISTANCE_THRESHOLD_KM) {
@@ -297,7 +344,10 @@ function shouldStartNewNodeCluster(
     : false;
 }
 
-function getClusterTimeGapMs(cluster: MutableNodeCluster, assetTakenAtMs: number) {
+function getClusterTimeGapMs(
+  cluster: MutableNodeCluster,
+  assetTakenAtMs: number,
+) {
   const startMs = toTimeMs(cluster.startsAt);
   const endMs = toTimeMs(cluster.endsAt);
 
@@ -320,70 +370,162 @@ async function resolvePickedAsset(
   asset: ImagePicker.ImagePickerAsset,
   selectionIndex: number,
 ): Promise<ImportedTripMediaDraft> {
-  const assetInfo = await getAssetInfo(asset.assetId);
+  const assetInfo = await resolveAssetInfo(asset);
   const coordinate = getCoordinate(asset, assetInfo);
 
   return {
     hasGps: coordinate != null,
     latitude: coordinate?.latitude ?? null,
     longitude: coordinate?.longitude ?? null,
-    placementStatus: coordinate ? 'placed' : 'missing_location',
+    placementStatus: coordinate ? "placed" : "missing_location",
     remoteUrl: asset.uri,
     selectionIndex,
     sourceAssetId: asset.assetId ?? null,
     takenAt: getTakenAt(asset, assetInfo),
-    type: asset.type === 'video' ? 'video' : 'photo',
+    type: asset.type === "video" ? "video" : "photo",
   };
 }
 
-async function getAssetInfo(assetId?: string | null): Promise<MaybeAssetInfo> {
-  if (!assetId) {
-    return null;
+async function resolveAssetInfo(
+  asset: ImagePicker.ImagePickerAsset,
+): Promise<MaybeAssetInfo> {
+  const directAssetInfo = await getAssetInfo(asset.assetId);
+
+  if (directAssetInfo) {
+    return directAssetInfo;
   }
 
+  const matchedAssetId = await findMatchingMediaLibraryAssetId(asset);
+
+  return matchedAssetId ? await getAssetInfo(matchedAssetId) : null;
+}
+
+async function findMatchingMediaLibraryAssetId(
+  asset: ImagePicker.ImagePickerAsset,
+) {
+  const takenAt = getTakenAt(asset, null);
+  const createdAtMs = toTimeMs(takenAt);
+  const createdAfter =
+    createdAtMs != null
+      ? new Date(createdAtMs - 7 * 24 * 60 * 60 * 1000)
+      : undefined;
+  const createdBefore =
+    createdAtMs != null
+      ? new Date(createdAtMs + 7 * 24 * 60 * 60 * 1000)
+      : undefined;
+
   try {
-    return await MediaLibrary.getAssetInfoAsync(assetId, {
-      shouldDownloadFromNetwork: false,
+    const result = await MediaLibrary.getAssetsAsync({
+      createdAfter,
+      createdBefore,
+      first: 200,
+      mediaType:
+        asset.type === "video"
+          ? MediaLibrary.MediaType.video
+          : MediaLibrary.MediaType.photo,
+      sortBy: [[MediaLibrary.SortBy.creationTime, false]],
     });
+    const exactFileNameMatch = result.assets.find((candidate) =>
+      isMatchingPickedAsset(candidate, asset, true),
+    );
+
+    if (exactFileNameMatch) {
+      return exactFileNameMatch.id;
+    }
+
+    const looseMatch = result.assets.find((candidate) =>
+      isMatchingPickedAsset(candidate, asset, false),
+    );
+
+    return looseMatch?.id ?? null;
   } catch {
     return null;
   }
 }
 
-function getTakenAt(asset: ImagePicker.ImagePickerAsset, assetInfo: MaybeAssetInfo) {
+function isMatchingPickedAsset(
+  candidate: MediaLibrary.Asset,
+  asset: ImagePicker.ImagePickerAsset,
+  requireFileNameMatch: boolean,
+) {
+  if (asset.fileName && candidate.filename !== asset.fileName) {
+    return false;
+  }
+
+  if (requireFileNameMatch && !asset.fileName) {
+    return false;
+  }
+
+  if (candidate.width !== asset.width || candidate.height !== asset.height) {
+    return false;
+  }
+
+  const pickedTakenAtMs = toTimeMs(getTakenAt(asset, null));
+
+  if (pickedTakenAtMs == null) {
+    return true;
+  }
+
+  return (
+    Math.abs(candidate.creationTime - pickedTakenAtMs) <= 24 * 60 * 60 * 1000
+  );
+}
+
+function getTakenAt(
+  asset: ImagePicker.ImagePickerAsset,
+  assetInfo: MaybeAssetInfo,
+) {
   const creationTime = assetInfo?.creationTime;
 
-  if (typeof creationTime === 'number' && Number.isFinite(creationTime) && creationTime > 0) {
+  if (
+    typeof creationTime === "number" &&
+    Number.isFinite(creationTime) &&
+    creationTime > 0
+  ) {
     return new Date(creationTime).toISOString();
   }
 
-  const exif = getExifRecord(asset);
+  const exif = getExifRecord(asset, assetInfo);
   const exifDateTime =
-    (typeof exif?.DateTimeOriginal === 'string' && exif.DateTimeOriginal) ||
-    (typeof exif?.DateTimeDigitized === 'string' && exif.DateTimeDigitized) ||
-    (typeof exif?.DateTime === 'string' && exif.DateTime) ||
+    (typeof exif?.DateTimeOriginal === "string" && exif.DateTimeOriginal) ||
+    (typeof exif?.DateTimeDigitized === "string" && exif.DateTimeDigitized) ||
+    (typeof exif?.DateTime === "string" && exif.DateTime) ||
     null;
 
   if (!exifDateTime) {
     return null;
   }
 
-  const normalized = exifDateTime.replace(/^([0-9]{4}):([0-9]{2}):([0-9]{2})/, '$1-$2-$3');
+  const normalized = exifDateTime.replace(
+    /^([0-9]{4}):([0-9]{2}):([0-9]{2})/,
+    "$1-$2-$3",
+  );
   const parsed = new Date(normalized);
 
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
-function getCoordinate(asset: ImagePicker.ImagePickerAsset, assetInfo: MaybeAssetInfo) {
+function getCoordinate(
+  asset: ImagePicker.ImagePickerAsset,
+  assetInfo: MaybeAssetInfo,
+) {
+  const exif = getExifRecord(asset, assetInfo);
+  const exifCoordinate = getCoordinateFromExif(exif);
+
+  if (exifCoordinate && !isZeroCoordinatePair(exifCoordinate)) {
+    return exifCoordinate;
+  }
+
   const infoLocation =
-    assetInfo && 'location' in assetInfo && assetInfo.location
+    assetInfo && "location" in assetInfo && assetInfo.location
       ? assetInfo.location
       : null;
 
   if (
     infoLocation &&
-    typeof infoLocation.latitude === 'number' &&
-    typeof infoLocation.longitude === 'number'
+    typeof infoLocation.latitude === "number" &&
+    typeof infoLocation.longitude === "number" &&
+    !isZeroCoordinatePair(infoLocation)
   ) {
     return {
       latitude: infoLocation.latitude,
@@ -391,18 +533,107 @@ function getCoordinate(asset: ImagePicker.ImagePickerAsset, assetInfo: MaybeAsse
     };
   }
 
-  const exif = getExifRecord(asset);
-  const latitude = parseExifCoordinate(exif?.GPSLatitude ?? exif?.latitude, exif?.GPSLatitudeRef ?? exif?.latitudeRef);
-  const longitude = parseExifCoordinate(
-    exif?.GPSLongitude ?? exif?.longitude,
-    exif?.GPSLongitudeRef ?? exif?.longitudeRef,
+  return null;
+}
+
+function getExifRecord(
+  asset: ImagePicker.ImagePickerAsset,
+  assetInfo?: MaybeAssetInfo,
+) {
+  const assetExif =
+    typeof asset.exif === "object" && asset.exif
+      ? (asset.exif as Record<string, unknown>)
+      : null;
+  const assetInfoExif =
+    assetInfo &&
+    "exif" in assetInfo &&
+    typeof assetInfo.exif === "object" &&
+    assetInfo.exif
+      ? (assetInfo.exif as Record<string, unknown>)
+      : null;
+
+  if (assetExif && assetInfoExif) {
+    return {
+      ...assetInfoExif,
+      ...assetExif,
+    };
+  }
+
+  return assetExif ?? assetInfoExif ?? null;
+}
+
+function getCoordinateFromExif(exif: Record<string, unknown> | null) {
+  if (!exif) {
+    return null;
+  }
+
+  const gpsPosition = parseExifPosition(
+    exif.GPSPosition ?? exif.gpsPosition ?? exif.position,
   );
+
+  if (gpsPosition) {
+    return gpsPosition;
+  }
+
+  const latitude = pickExifCoordinateCandidate([
+    { value: exif.GPSLatitude, ref: exif.GPSLatitudeRef },
+    { value: exif.latitude, ref: exif.latitudeRef },
+  ]);
+  const longitude = pickExifCoordinateCandidate([
+    { value: exif.GPSLongitude, ref: exif.GPSLongitudeRef },
+    { value: exif.longitude, ref: exif.longitudeRef },
+  ]);
 
   return latitude != null && longitude != null ? { latitude, longitude } : null;
 }
 
-function getExifRecord(asset: ImagePicker.ImagePickerAsset) {
-  return typeof asset.exif === 'object' && asset.exif ? (asset.exif as Record<string, unknown>) : null;
+function parseExifPosition(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const parts = value.split(",");
+
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const latitude = parseExifCoordinate(parts[0], null);
+  const longitude = parseExifCoordinate(parts.slice(1).join(",").trim(), null);
+
+  return latitude != null && longitude != null ? { latitude, longitude } : null;
+}
+
+function pickExifCoordinateCandidate(
+  candidates: Array<{ value: unknown; ref: unknown }>,
+) {
+  let zeroCandidate: number | null = null;
+
+  for (const candidate of candidates) {
+    const parsed = parseExifCoordinate(candidate.value, candidate.ref);
+
+    if (parsed == null) {
+      continue;
+    }
+
+    if (Math.abs(parsed) > 0.000001) {
+      return parsed;
+    }
+
+    zeroCandidate = parsed;
+  }
+
+  return zeroCandidate;
+}
+
+function isZeroCoordinatePair(coordinate: {
+  latitude: number;
+  longitude: number;
+}) {
+  return (
+    Math.abs(coordinate.latitude) <= 0.000001 &&
+    Math.abs(coordinate.longitude) <= 0.000001
+  );
 }
 
 function parseExifCoordinate(value: unknown, ref: unknown) {
@@ -412,21 +643,38 @@ function parseExifCoordinate(value: unknown, ref: unknown) {
     return null;
   }
 
-  const normalizedRef = typeof ref === 'string' ? ref.toUpperCase() : null;
+  const normalizedRef =
+    typeof ref === "string" ? ref.trim().toUpperCase() : null;
 
-  if (normalizedRef === 'S' || normalizedRef === 'W') {
+  if (normalizedRef?.startsWith("S") || normalizedRef?.startsWith("W")) {
     return -Math.abs(decimal);
+  }
+
+  if (normalizedRef?.startsWith("N") || normalizedRef?.startsWith("E")) {
+    return Math.abs(decimal);
+  }
+
+  if (typeof value === "string") {
+    const normalizedValue = value.trim().toUpperCase();
+
+    if (/\b(S|SOUTH|W|WEST)\b/.test(normalizedValue)) {
+      return -Math.abs(decimal);
+    }
+
+    if (/\b(N|NORTH|E|EAST)\b/.test(normalizedValue)) {
+      return Math.abs(decimal);
+    }
   }
 
   return decimal;
 }
 
 function normalizeCoordinateValue(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (typeof value === "number" && Number.isFinite(value)) {
     return value;
   }
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const parts = value
       .split(/[^0-9.\-]+/)
       .map((part) => Number(part))
@@ -437,7 +685,7 @@ function normalizeCoordinateValue(value: unknown): number | null {
 
   if (Array.isArray(value)) {
     const parts = value
-      .map((part) => (typeof part === 'number' ? part : Number(part)))
+      .map((part) => (typeof part === "number" ? part : Number(part)))
       .filter((part) => Number.isFinite(part));
 
     return decimalFromCoordinateParts(parts);
@@ -469,16 +717,19 @@ async function resolveLocationLabel(
   sortOrder: number,
 ): Promise<ResolvedLocationLabel> {
   try {
-    const placemarks = await Location.reverseGeocodeAsync({ latitude, longitude });
+    const placemarks = await Location.reverseGeocodeAsync({
+      latitude,
+      longitude,
+    });
     const placemark = placemarks[0];
     const locality =
       placemark?.city?.trim() ||
       placemark?.district?.trim() ||
       placemark?.subregion?.trim() ||
       placemark?.region?.trim() ||
-      '';
-    const countryName = placemark?.country?.trim() || '';
-    const locationName = [locality, countryName].filter(Boolean).join(', ');
+      "";
+    const countryName = placemark?.country?.trim() || "";
+    const locationName = [locality, countryName].filter(Boolean).join(", ");
     const title = locality || countryName || `Stop ${sortOrder + 1}`;
 
     return {
@@ -490,7 +741,7 @@ async function resolveLocationLabel(
     const fallback = formatCoordinateLabel(latitude, longitude);
 
     return {
-      countryName: '',
+      countryName: "",
       locationName: fallback,
       title: `Stop ${sortOrder + 1}`,
     };
@@ -501,7 +752,10 @@ function formatCoordinateLabel(latitude: number, longitude: number) {
   return `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
 }
 
-function compareImportedMediaByTime(left: ImportedTripMediaDraft, right: ImportedTripMediaDraft) {
+function compareImportedMediaByTime(
+  left: ImportedTripMediaDraft,
+  right: ImportedTripMediaDraft,
+) {
   if (left.takenAt && right.takenAt) {
     return left.takenAt.localeCompare(right.takenAt);
   }
@@ -553,8 +807,8 @@ function getDayKey(takenAt: string | null) {
   }
 
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 }
@@ -569,7 +823,10 @@ function toTimeMs(value: string | null) {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-function haversineKm([lng1, lat1]: [number, number], [lng2, lat2]: [number, number]) {
+function haversineKm(
+  [lng1, lat1]: [number, number],
+  [lng2, lat2]: [number, number],
+) {
   const toRad = (value: number) => (value * Math.PI) / 180;
   const earthRadiusKm = 6371;
   const dLat = toRad(lat2 - lat1);

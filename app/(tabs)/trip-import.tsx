@@ -1,27 +1,12 @@
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  BackHandler,
-  ScrollView,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Alert, BackHandler, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  ActionButton,
-  EditHeader,
-  EditSheet,
-  HighlightCard,
-  MetaPill,
-  SectionHeading,
-} from '@/components/trip-edit';
-import { ImportStopEditor, getImportedMediaId } from '@/components/trip-import';
-import { wanderableTheme } from '@/constants/wanderableTheme';
+import { EditHeader, EditSheet } from '@/components/trip-edit';
+import { TripImportActions, TripImportPreview, getImportedMediaId } from '@/components/trip-import';
 import { useCreateImportedDraftTrip } from '@/lib/trips/hooks';
 import {
   buildTripImportDraftFromAssets,
@@ -29,8 +14,6 @@ import {
   type ImportedTripMediaDraft,
   type ImportedTripNodeDraft,
 } from '@/lib/trips/import';
-
-const { colors } = wanderableTheme;
 
 export default function TripImportScreen() {
   const insets = useSafeAreaInsets();
@@ -98,12 +81,31 @@ export default function TripImportScreen() {
     setIsPickingPhotos(true);
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      let [pickerPermission, mediaLibraryPermission] = await Promise.all([
+        ImagePicker.requestMediaLibraryPermissionsAsync(),
+        MediaLibrary.requestPermissionsAsync(),
+      ]);
 
-      if (!permission.granted) {
+      if (mediaLibraryPermission.granted && mediaLibraryPermission.accessPrivileges === 'limited') {
+        await MediaLibrary.presentPermissionsPickerAsync(['photo']);
+        [pickerPermission, mediaLibraryPermission] = await Promise.all([
+          ImagePicker.requestMediaLibraryPermissionsAsync(),
+          MediaLibrary.getPermissionsAsync(),
+        ]);
+      }
+
+      if (!pickerPermission.granted || !mediaLibraryPermission.granted) {
         Alert.alert(
           'Photo access needed',
           'Allow Wanderable to read your library so it can rebuild a draft trip from your photo metadata.',
+        );
+        return;
+      }
+
+      if (mediaLibraryPermission.accessPrivileges === 'limited') {
+        Alert.alert(
+          'Full photo access needed',
+          'Wanderable needs full photo-library access to read original location metadata from your photos.',
         );
         return;
       }
@@ -404,145 +406,52 @@ export default function TripImportScreen() {
             paddingTop: s(26),
             paddingBottom: s(32),
           }}>
-          <SectionHeading title="Import media" scale={scale} />
-
-          <View style={{ marginTop: s(16), gap: s(10) }}>
-            <ActionButton
-              title={
-                isPickingPhotos
-                  ? 'Opening library...'
-                  : isAnalyzingPhotos
-                    ? 'Reading metadata...'
-                    : '+ Import photos'
-              }
-              onPress={addPhotos}
-              disabled={isBusy}
-              scale={scale}
-            />
-            <ActionButton
-              title={createTripMutation.isPending ? 'Creating trip...' : 'Create trip'}
-              tone="soft"
-              onPress={createTrip}
-              disabled={!canCreateTrip}
-              scale={scale}
-            />
-          </View>
-
-          <View className="mt-4 flex-row flex-wrap" style={{ gap: s(10) }}>
-            <MetaPill label="Photos" value={String(draft?.totalAssetCount ?? 0)} scale={scale} />
-            <MetaPill label="Mapped" value={String(placedPhotoCount)} scale={scale} />
-            <MetaPill label="Stops" value={String(previewNodes.length)} scale={scale} />
-            <MetaPill label="Unplaced" value={String(draft?.missingLocationCount ?? 0)} scale={scale} />
-          </View>
-
-          {isAnalyzingPhotos ? (
-            <View
-              className="mt-4 items-center rounded-[24px] bg-[#F6F4F8]"
-              style={{ padding: s(20) }}>
-              <ActivityIndicator color={colors.brand.primary} />
-              <Text
-                className="mt-3 font-extrabold"
-                style={{ fontSize: s(16), color: colors.text.primary }}>
-                Rebuilding your itinerary
-              </Text>
-              <Text
-                className="mt-2 text-center font-semibold"
-                style={{ fontSize: s(12), lineHeight: s(18), color: colors.text.muted }}>
-                Grouping photos into days and mapped highlights from the metadata.
-              </Text>
-            </View>
-          ) : null}
+          <TripImportActions
+            canCreateTrip={canCreateTrip}
+            isAnalyzingPhotos={isAnalyzingPhotos}
+            isBusy={isBusy}
+            isCreatingTrip={createTripMutation.isPending}
+            isPickingPhotos={isPickingPhotos}
+            mappedPhotoCount={placedPhotoCount}
+            scale={scale}
+            stopCount={previewNodes.length}
+            totalPhotoCount={draft?.totalAssetCount ?? 0}
+            unplacedPhotoCount={draft?.missingLocationCount ?? 0}
+            onAddPhotos={addPhotos}
+            onCreateTrip={createTrip}
+          />
 
           {draft ? (
-            <View style={{ marginTop: s(20), gap: s(18) }}>
-              <SectionHeading
-                title="Preview"
-                body={
-                  draft.days.length > 0
-                    ? 'Tap a stop to finish photos and location.'
-                    : 'We could not find enough metadata to seed map stops from this batch.'
-                }
-                scale={scale}
-              />
-
-              {draft.days.length > 0 ? (
-                previewNodes.map(({ day, node }) => (
-                  <HighlightCard
-                    key={getStopKey(node)}
-                    coverUri={node.media[0]?.remoteUrl ?? null}
-                    dateLabel={day.dayDate ? `${day.label} - ${formatImportedDay(day.dayDate)}` : `${day.label} - Date TBD`}
-                    locationName={node.locationName || 'Add location'}
-                    timeRange={`${node.media.length} imported photo${node.media.length === 1 ? '' : 's'}`}
-                    title={node.title}
-                    scale={scale}
-                    onPress={() => setActiveStopAndResetSelections(node)}
-                  />
-                ))
-              ) : (
-                <View className="rounded-[24px] bg-[#F6F4F8]" style={{ padding: s(18) }}>
-                  <Text
-                    className="font-extrabold"
-                    style={{ fontSize: s(14), color: colors.text.primary }}>
-                    No mapped highlights yet.
-                  </Text>
-                  <Text
-                    className="mt-2 font-semibold"
-                    style={{ fontSize: s(12), lineHeight: s(18), color: colors.text.muted }}>
-                    Pick photos with location metadata enabled so Wanderable can place them on the map.
-                  </Text>
-                </View>
-              )}
-
-              {activeStop ? (
-                <ImportStopEditor
-                  editorWidth={width - s(96)}
-                  locationValue={activeStop.node.locationName}
-                  missingMedia={draft.missingGpsMedia}
-                  needsLocation={stopNeedsLocation(activeStop.node)}
-                  node={activeStop.node}
-                  scale={scale}
-                  selectedNodeMediaId={selectedNodeMediaId}
-                  selectedQueueMediaId={selectedQueueMediaId}
-                  visible={!!activeStop}
-                  onAssignSelectedQueueMedia={assignSelectedQueueMedia}
-                  onChooseLocation={updateActiveStopLocation}
-                  onClose={() => {
-                    setActiveStopKey(null);
-                    setSelectedNodeMediaId(null);
-                    setSelectedQueueMediaId(null);
-                  }}
-                  onReorderNodeMedia={reorderActiveStopMedia}
-                  onReturnSelectedNodeMedia={returnSelectedNodeMedia}
-                  onSelectNodeMedia={(mediaId) => {
-                    setSelectedNodeMediaId(mediaId);
-                    setSelectedQueueMediaId(null);
-                  }}
-                  onSelectQueueMedia={(mediaId) => {
-                    setSelectedQueueMediaId(mediaId);
-                    setSelectedNodeMediaId(null);
-                  }}
-                />
-              ) : null}
-
-              {draft.missingLocationCount > 0 || unresolvedLocationCount > 0 ? (
-                <View className="rounded-[24px] bg-[#F6F4F8]" style={{ padding: s(18) }}>
-                  <Text
-                    className="font-extrabold"
-                    style={{ fontSize: s(14), color: colors.text.primary }}>
-                    {[
-                      draft.missingLocationCount > 0
-                        ? `${draft.missingLocationCount} photo${draft.missingLocationCount === 1 ? '' : 's'} left`
-                        : null,
-                      unresolvedLocationCount > 0
-                        ? `${unresolvedLocationCount} stop${unresolvedLocationCount === 1 ? '' : 's'} need location`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' • ')}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
+            <TripImportPreview
+              activeStop={activeStop}
+              draft={draft}
+              editorWidth={width - s(96)}
+              formatImportedDay={formatImportedDay}
+              previewNodes={previewNodes}
+              scale={scale}
+              selectedNodeMediaId={selectedNodeMediaId}
+              selectedQueueMediaId={selectedQueueMediaId}
+              stopNeedsLocation={stopNeedsLocation}
+              unresolvedLocationCount={unresolvedLocationCount}
+              onAssignSelectedQueueMedia={assignSelectedQueueMedia}
+              onChooseLocation={updateActiveStopLocation}
+              onCloseEditor={() => {
+                setActiveStopKey(null);
+                setSelectedNodeMediaId(null);
+                setSelectedQueueMediaId(null);
+              }}
+              onOpenStop={setActiveStopAndResetSelections}
+              onReorderNodeMedia={reorderActiveStopMedia}
+              onReturnSelectedNodeMedia={returnSelectedNodeMedia}
+              onSelectNodeMedia={(mediaId) => {
+                setSelectedNodeMediaId(mediaId);
+                setSelectedQueueMediaId(null);
+              }}
+              onSelectQueueMedia={(mediaId) => {
+                setSelectedQueueMediaId(mediaId);
+                setSelectedNodeMediaId(null);
+              }}
+            />
           ) : null}
         </EditSheet>
       </ScrollView>
