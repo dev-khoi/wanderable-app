@@ -32,7 +32,7 @@ export default function TripViewScreen() {
   if (tripQuery.isLoading) {
     return (
       <TripViewStatus
-        body="Pulling your trip, stories, and map route from Supabase."
+        // body="Pulling your trip, stories, and map route from Supabase."
         title="Loading trip"
       />
     );
